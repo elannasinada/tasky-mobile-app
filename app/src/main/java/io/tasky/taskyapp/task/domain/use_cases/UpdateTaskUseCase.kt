@@ -20,6 +20,11 @@ class UpdateTaskUseCase(
      * @param taskType New task type.
      * @param deadlineDate New deadline date.
      * @param deadlineTime New deadline time.
+     * @param status New task status.
+     * @param isRecurring Whether the task is recurring.
+     * @param recurrencePattern The recurrence pattern of the task.
+     * @param recurrenceInterval The recurrence interval of the task.
+     * @param recurrenceEndDate The recurrence end date of the task.
      */
     suspend operator fun invoke(
         userData: UserData,
@@ -28,7 +33,12 @@ class UpdateTaskUseCase(
         description: String = "",
         taskType: String,
         deadlineDate: String,
-        deadlineTime: String
+        deadlineTime: String,
+        status: String = task.status,
+        isRecurring: Boolean = task.isRecurring,
+        recurrencePattern: String? = task.recurrencePattern,
+        recurrenceInterval: Int = task.recurrenceInterval,
+        recurrenceEndDate: String? = task.recurrenceEndDate
     ) {
         if (title.isBlank())
             throw Exception("You can't save without a title")
@@ -44,6 +54,11 @@ class UpdateTaskUseCase(
                 taskType = taskType,
                 deadlineDate = deadlineDate.replace("/", "-"),
                 deadlineTime = deadlineTime,
+                status = status,
+                isRecurring = isRecurring,
+                recurrencePattern = recurrencePattern,
+                recurrenceInterval = recurrenceInterval,
+                recurrenceEndDate = recurrenceEndDate
             )
         )
     }

@@ -14,6 +14,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,9 +33,67 @@ import androidx.compose.ui.unit.sp
 import io.tasky.taskyapp.R
 import io.tasky.taskyapp.core.presentation.widgets.DefaultIconButton
 import io.tasky.taskyapp.core.presentation.widgets.DefaultTextButton
+import io.tasky.taskyapp.core.util.shimmerAnimation
 import io.tasky.taskyapp.task.domain.model.TaskType
 import io.tasky.taskyapp.ui.theme.Blue70
 import io.tasky.taskyapp.ui.theme.Purple80
+
+@Composable
+fun TaskShimmerCard() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                // Shimmer for title
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth(0.7f)
+                        .height(24.dp)
+                        .shimmerAnimation(),
+                    shape = RoundedCornerShape(4.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background)
+                ) {}
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Shimmer for date
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth(0.4f)
+                        .height(16.dp)
+                        .shimmerAnimation(),
+                    shape = RoundedCornerShape(4.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background)
+                ) {}
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Shimmer for status chip
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth(0.3f)
+                        .height(20.dp)
+                        .shimmerAnimation(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background)
+                ) {}
+            }
+        }
+    }
+}
 
 @Composable
 fun NewTaskBottomSheetContent(

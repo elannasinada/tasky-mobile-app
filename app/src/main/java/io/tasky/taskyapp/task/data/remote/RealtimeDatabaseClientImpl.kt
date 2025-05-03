@@ -28,7 +28,7 @@ class RealtimeDatabaseClientImpl(
     override fun getTasksFromUser(user: UserData) = flow {
         val result = database.child(user.userId ?: return@flow).get().await()
         val tasks = result.children.map {
-            Task.fromSnapshot(it.value as HashMap<String, String>)
+            Task.fromSnapshot(it.value as HashMap<String, Any?>)
         }
 
         emit(

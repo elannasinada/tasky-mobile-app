@@ -13,18 +13,32 @@ data class Task(
     val taskType: String,
     var deadlineDate: String? = null,
     var deadlineTime: String? = null,
+    var status: String = TaskStatus.PENDING.name,
+    var isRecurring: Boolean = false,
+    var recurrencePattern: String? = null, 
+    var recurrenceInterval: Int = 1, 
+    var recurrenceEndDate: String? = null
 ) {
     companion object {
         fun fromJson(json: String): Task = Gson().fromJson(json, Task::class.java)
 
-        fun fromSnapshot(hashMap: HashMap<String, String>): Task {
+        fun fromSnapshot(hashMap: HashMap<String, Any?>): Task {
             return Task(
-                uuid = hashMap["uuid"] ?: "",
-                title = hashMap["title"] ?: "",
-                description = hashMap["description"],
-                taskType = hashMap["taskType"] ?: "",
-                deadlineDate = hashMap["deadlineDate"],
-                deadlineTime = hashMap["deadlineTime"]
+                uuid = hashMap["uuid"]?.toString() ?: "",
+                title = hashMap["title"]?.toString() ?: "",
+                description = hashMap["description"]?.toString(),
+                taskType = hashMap["taskType"]?.toString() ?: "",
+                deadlineDate = hashMap["deadlineDate"]?.toString(),
+                deadlineTime = hashMap["deadlineTime"]?.toString(),
+                status = hashMap["status"]?.toString() ?: TaskStatus.PENDING.name,
+                isRecurring = hashMap["isRecurring"]?.toString()?.toBoolean() ?: false,
+                recurrencePattern = hashMap["recurrencePattern"]?.toString(),
+                recurrenceInterval = when (val interval = hashMap["recurrenceInterval"]) {
+                    is Number -> interval.toInt()
+                    is String -> interval.toIntOrNull() ?: 1
+                    else -> 1
+                },
+                recurrenceEndDate = hashMap["recurrenceEndDate"]?.toString()
             )
         }
     }

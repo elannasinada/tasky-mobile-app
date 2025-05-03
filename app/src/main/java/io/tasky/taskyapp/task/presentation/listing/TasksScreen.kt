@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.ModalBottomSheetLayout
@@ -58,6 +59,8 @@ import io.tasky.taskyapp.task.presentation.widgets.TaskCard
 import io.tasky.taskyapp.task.presentation.widgets.TaskShimmerCard
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 @ExperimentalComposeUiApi
 @ExperimentalMaterial3Api
@@ -112,9 +115,10 @@ fun TasksScreen(
                 coroutineScope.launch {
                     bottomSheetState.hide()
                 }
+                val taskJson = Task(title = "", taskType = selectedTaskType.value).toJson()
+                val encodedTaskJson = URLEncoder.encode(taskJson, StandardCharsets.UTF_8.toString())
                 navController.navigate(
-                    MainScreens.TaskDetailsScreen.name +
-                        "/${Task(title = "", taskType = selectedTaskType.value).toJson()}"
+                    MainScreens.TaskDetailsScreen.name + "/$encodedTaskJson"
                 )
             }
         },
@@ -237,25 +241,29 @@ private fun TasksScaffold(
                         start = 16.dp,
                         top = 16.dp,
                         end = 16.dp,
-                        bottom = 16.dp
+                        bottom = 0.dp
                     ),
                     onSearch = { filter ->
                         onSearchTask.invoke(filter)
                     },
                 )
 
-                LazyColumn {
+                LazyColumn(
+                    modifier = Modifier.padding(top = 16.dp)
+                ) {
                     if (state.loading) {
                         items(3) {
                             TaskShimmerCard()
                         }
                     } else {
-                        items(state.tasks) { task ->
+                        itemsIndexed(state.tasks) { index, task ->
                             TaskCard(
                                 task = task,
                                 onClickCard = {
+                                    val taskJson = task.toJson()
+                                    val encodedTaskJson = URLEncoder.encode(taskJson, StandardCharsets.UTF_8.toString())
                                     navController.navigate(
-                                        MainScreens.TaskDetailsScreen.name + "/${task.toJson()}"
+                                        MainScreens.TaskDetailsScreen.name + "/$encodedTaskJson"
                                     )
                                 },
                                 onClickDelete = {
@@ -270,7 +278,11 @@ private fun TasksScaffold(
                                             onRestoreTask.invoke()
                                         }
                                     }
-                                }
+                                },
+                                modifier = Modifier.padding(
+                                    top = if (index == 0) 16.dp else 0.dp,
+                                    bottom = 8.dp
+                                )
                             )
                         }
                     }

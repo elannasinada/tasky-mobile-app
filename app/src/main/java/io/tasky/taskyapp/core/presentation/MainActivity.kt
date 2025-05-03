@@ -44,6 +44,8 @@ import io.tasky.taskyapp.ui.theme.TaskyTheme
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 
 /**
  * Activity on which every screen of the app is displayed.
@@ -214,28 +216,40 @@ class MainActivity : ComponentActivity() {
                             }
 
                             backStackEntry.arguments?.getString(TASK)?.let {
-                                taskDetailsState.task = Task.fromJson(it)
+                                val task = Task.fromJson(URLDecoder.decode(it, StandardCharsets.UTF_8.toString()))
+                                taskDetailsState.task = task
+                                taskDetailsViewModel.onEvent(TaskDetailsEvent.SetTaskData(task))
 
                                 TaskDetailsScreen(
                                     navController = navController,
                                     state = taskDetailsState,
-                                    onRequestInsert = { title, description, date, time ->
+                                    onRequestInsert = { title, description, date, time, status, isRecurring, recurrencePattern, recurrenceInterval, recurrenceEndDate ->
                                         taskDetailsViewModel.onEvent(
                                             TaskDetailsEvent.RequestInsert(
                                                 title = title,
                                                 description = description,
                                                 date = date,
                                                 time = time,
+                                                status = status,
+                                                isRecurring = isRecurring,
+                                                recurrencePattern = recurrencePattern,
+                                                recurrenceInterval = recurrenceInterval,
+                                                recurrenceEndDate = recurrenceEndDate
                                             )
                                         )
                                     },
-                                    onRequestUpdate = { title, description, date, time ->
+                                    onRequestUpdate = { title, description, date, time, status, isRecurring, recurrencePattern, recurrenceInterval, recurrenceEndDate ->
                                         taskDetailsViewModel.onEvent(
                                             TaskDetailsEvent.RequestUpdate(
                                                 title = title,
                                                 description = description,
                                                 date = date,
                                                 time = time,
+                                                status = status,
+                                                isRecurring = isRecurring,
+                                                recurrencePattern = recurrencePattern,
+                                                recurrenceInterval = recurrenceInterval,
+                                                recurrenceEndDate = recurrenceEndDate
                                             )
                                         )
                                     },

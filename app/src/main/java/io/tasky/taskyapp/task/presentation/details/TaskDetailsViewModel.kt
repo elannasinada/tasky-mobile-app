@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.tasky.taskyapp.sign_in.domain.model.UserData
+import io.tasky.taskyapp.task.domain.model.TaskStatus
+import io.tasky.taskyapp.task.domain.model.RecurrencePattern
 import io.tasky.taskyapp.task.domain.use_cases.TaskUseCases
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +40,11 @@ class TaskDetailsViewModel @Inject constructor(
                     description = event.description,
                     date = event.date,
                     time = event.time,
+                    status = event.status,
+                    isRecurring = event.isRecurring,
+                    recurrencePattern = event.recurrencePattern,
+                    recurrenceInterval = event.recurrenceInterval,
+                    recurrenceEndDate = event.recurrenceEndDate
                 )
             }
             is TaskDetailsEvent.RequestUpdate -> {
@@ -46,7 +53,15 @@ class TaskDetailsViewModel @Inject constructor(
                     description = event.description,
                     date = event.date,
                     time = event.time,
+                    status = event.status,
+                    isRecurring = event.isRecurring,
+                    recurrencePattern = event.recurrencePattern,
+                    recurrenceInterval = event.recurrenceInterval,
+                    recurrenceEndDate = event.recurrenceEndDate
                 )
+            }
+            is TaskDetailsEvent.SetTaskData -> {
+                _state.value = _state.value.copy(task = event.task)
             }
         }
     }
@@ -55,7 +70,12 @@ class TaskDetailsViewModel @Inject constructor(
         title: String,
         description: String,
         date: String,
-        time: String
+        time: String,
+        status: String,
+        isRecurring: Boolean = false,
+        recurrencePattern: String? = null,
+        recurrenceInterval: Int = 1,
+        recurrenceEndDate: String? = null
     ) {
         viewModelScope.launch {
             try {
@@ -68,6 +88,11 @@ class TaskDetailsViewModel @Inject constructor(
                     taskType = _state.value.task!!.taskType,
                     deadlineDate = date,
                     deadlineTime = time,
+                    status = TaskStatus.valueOf(status),
+                    isRecurring = isRecurring,
+                    recurrencePattern = if (isRecurring) recurrencePattern else null,
+                    recurrenceInterval = if (isRecurring) recurrenceInterval else 1,
+                    recurrenceEndDate = if (isRecurring && !recurrenceEndDate.isNullOrBlank()) recurrenceEndDate else null
                 )
 
                 _eventFlow.emit(UiEvent.Finish)
@@ -83,7 +108,12 @@ class TaskDetailsViewModel @Inject constructor(
         title: String,
         description: String,
         date: String,
-        time: String
+        time: String,
+        status: String,
+        isRecurring: Boolean = false,
+        recurrencePattern: String? = null,
+        recurrenceInterval: Int = 1,
+        recurrenceEndDate: String? = null
     ) {
         viewModelScope.launch {
             try {
@@ -94,9 +124,14 @@ class TaskDetailsViewModel @Inject constructor(
                     task = task,
                     title = title,
                     description = description,
-                    taskType = _state.value.task!!.taskType,
+                    taskType = task.taskType,
                     deadlineDate = date,
                     deadlineTime = time,
+                    status = status,
+                    isRecurring = isRecurring,
+                    recurrencePattern = if (isRecurring) recurrencePattern else null,
+                    recurrenceInterval = if (isRecurring) recurrenceInterval else 1,
+                    recurrenceEndDate = if (isRecurring && !recurrenceEndDate.isNullOrBlank()) recurrenceEndDate else null
                 )
 
                 _eventFlow.emit(UiEvent.Finish)
