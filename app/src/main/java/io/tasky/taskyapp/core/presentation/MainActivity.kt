@@ -25,8 +25,14 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.api.services.calendar.CalendarScopes
 import dagger.hilt.android.AndroidEntryPoint
 import io.tasky.taskyapp.R
+import io.tasky.taskyapp.calendar.presentation.CalendarScreen
+import io.tasky.taskyapp.calendar.presentation.CalendarViewModel
 import io.tasky.taskyapp.core.presentation.navigation.MainScreens
 import io.tasky.taskyapp.core.util.TASK
 import io.tasky.taskyapp.core.util.Toaster
@@ -41,9 +47,10 @@ import io.tasky.taskyapp.task.presentation.listing.TaskEvent
 import io.tasky.taskyapp.task.presentation.listing.TaskViewModel
 import io.tasky.taskyapp.task.presentation.listing.TasksScreen
 import io.tasky.taskyapp.ui.theme.TaskyTheme
+import io.tasky.taskyapp.calendar.presentation.CalendarScreen
+import javax.inject.Inject
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 
@@ -72,10 +79,8 @@ class MainActivity : ComponentActivity() {
 
                     val signInViewModel = hiltViewModel<SignInViewModel>()
                     val signInState = signInViewModel.state.collectAsState().value
-
                     val taskViewModel = hiltViewModel<TaskViewModel>()
                     val taskState = taskViewModel.state.collectAsState().value
-
                     val taskDetailsViewModel = hiltViewModel<TaskDetailsViewModel>()
                     val taskDetailsState = taskDetailsViewModel.state.collectAsState().value
 
@@ -103,8 +108,8 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
 
-                            LaunchedEffect(key1 = signInState.isSignInSuccessful) {
-                                if (signInState.isSignInSuccessful) {
+                            LaunchedEffect(key1 = signInState?.isSignInSuccessful) {
+                                if (signInState?.isSignInSuccessful == true) {
                                     toaster.showToast(R.string.sign_in_successful)
 
                                     navController.navigate(MainScreens.TaskScreen.name)
@@ -172,12 +177,36 @@ class MainActivity : ComponentActivity() {
                                 state = taskState,
                                 onSignOut = {
                                     lifecycleScope.launch {
-                                        signInViewModel.onEvent(SignInEvent.RequestLogout)
-                                        taskViewModel.clearState()
-                                        toaster.showToast(R.string.signed_out)
-                                        navController.navigate(MainScreens.SignInScreen.name) {
-                                            popUpTo(MainScreens.TaskScreen.name) {
-                                                inclusive = true
+                                        try {
+                                            // First clear any Google sign-in state
+                                            val oldGso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
+                                            val oldClient = GoogleSignIn.getClient(this@MainActivity, oldGso)
+                                            
+                                            // Sign out and revoke access
+                                            oldClient.signOut().addOnCompleteListener {
+                                                oldClient.revokeAccess().addOnCompleteListener {
+                                                    // Now proceed with regular logout
+                                                    lifecycleScope.launch {
+                                                        signInViewModel.onEvent(SignInEvent.RequestLogout)
+                                                        taskViewModel.clearState()
+                                                        toaster.showToast(R.string.signed_out)
+                                                        navController.navigate(MainScreens.SignInScreen.name) {
+                                                            popUpTo(MainScreens.TaskScreen.name) {
+                                                                inclusive = true
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        } catch (e: Exception) {
+                                            // If Google sign-out fails, still perform regular logout
+                                            signInViewModel.onEvent(SignInEvent.RequestLogout)
+                                            taskViewModel.clearState()
+                                            toaster.showToast(R.string.signed_out)
+                                            navController.navigate(MainScreens.SignInScreen.name) {
+                                                popUpTo(MainScreens.TaskScreen.name) {
+                                                    inclusive = true
+                                                }
                                             }
                                         }
                                     }
@@ -217,7 +246,7 @@ class MainActivity : ComponentActivity() {
 
                             backStackEntry.arguments?.getString(TASK)?.let {
                                 val task = Task.fromJson(URLDecoder.decode(it, StandardCharsets.UTF_8.toString()))
-                                taskDetailsState.task = task
+                                taskDetailsState?.task = task
                                 taskDetailsViewModel.onEvent(TaskDetailsEvent.SetTaskData(task))
 
                                 TaskDetailsScreen(
@@ -255,6 +284,104 @@ class MainActivity : ComponentActivity() {
                                     },
                                 )
                             }
+                        }
+
+                        composable(MainScreens.CalendarScreen.name) {
+                            signInViewModel.onEvent(SignInEvent.LoadSignedInUser)
+                            val userData = signInViewModel.currentUser
+                            
+                            val calendarViewModel = hiltViewModel<CalendarViewModel>()
+                            
+                            val googleSignInLauncher = rememberLauncherForActivityResult(
+                                contract = ActivityResultContracts.StartIntentSenderForResult(),
+                                onResult = { result ->
+                                    if (result.resultCode == RESULT_OK) {
+                                        signInViewModel.onEvent(
+                                            SignInEvent.RequestSignInWithGoogle(result.data)
+                                        )
+                                        // Return to calendar after sign-in
+                                        navController.navigate(MainScreens.CalendarScreen.name)
+                                    }
+                                }
+                            )
+                            
+                            // For handling calendar permission requests
+                            val calendarPermissionLauncher = rememberLauncherForActivityResult(
+                                contract = ActivityResultContracts.StartActivityForResult()
+                            ) { result: androidx.activity.result.ActivityResult ->
+                                if (result.resultCode == RESULT_OK) {
+                                    toaster.showToast("Sign-in successful, processing...")
+                                    
+                                    lifecycleScope.launch {
+                                        try {
+                                            kotlinx.coroutines.delay(500) // Wait half a second
+                                            
+                                            // Force immediate cache update by requesting account
+                                            GoogleSignIn.getLastSignedInAccount(this@MainActivity)
+                                            
+                                            calendarViewModel.handleSignInResult(result.data)
+                                            
+                                            // Show CalendarScreen after login
+                                            calendarViewModel.loadCalendarEvents(taskState?.tasks ?: emptyList())
+                                        } catch (e: Exception) {
+                                            toaster.showToast("Error processing sign-in: ${e.message}")
+                                        }
+                                    }
+                                } else {
+                                    // Sign-in was canceled or failed
+                                    val errorCode = result.resultCode
+                                    toaster.showToast("Google sign-in failed with code: $errorCode")
+                                    // Try to refresh UI state anyway
+                                    calendarViewModel.resetState()
+                                }
+                            }
+
+                            CalendarScreen(
+                                navController = navController,
+                                userData = userData,
+                                viewModel = calendarViewModel,
+                                onGoogleSignInClick = {
+                                    // Direct approach: use the calendarViewModel's RequestGoogleSignIn event
+                                    // This will use the calendar-specific sign-in flow
+                                    calendarViewModel.resetState()
+                                    toaster.showToast("Starting Google Calendar sign-in...")
+                                },
+                                onRequestGoogleSignIn = { options ->
+                                    try {
+                                        // First clear any existing clients
+                                        val oldGso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
+                                        val oldClient = GoogleSignIn.getClient(this@MainActivity, oldGso)
+
+                                        // Sign out and then proceed with sign in
+                                        oldClient.signOut().addOnCompleteListener {
+                                            oldClient.revokeAccess().addOnCompleteListener {
+                                                try {
+                                                    // Then create new client with the requested options
+                                                    val googleSignInClient = GoogleSignIn.getClient(this@MainActivity, options)
+                                                    
+                                                    // Get web client ID from resources - this is critical for OAuth to work
+                                                    val webClientId = getString(R.string.default_web_client_id)
+                                                    toaster.showToast("Opening Google sign-in with scopes...")
+                                                    
+                                                    // Create sign in intent with full scopes
+                                                    val signInIntent = googleSignInClient.signInIntent.apply {
+                                                        // Add calendar scope explicitly
+                                                        putExtra("scope", "email profile https://www.googleapis.com/auth/calendar.readonly")
+                                                    }
+                                                    
+                                                    calendarPermissionLauncher.launch(signInIntent)
+                                                } catch (e: Exception) {
+                                                    toaster.showToast("Error during sign-in: ${e.message}")
+                                                }
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        toaster.showToast("Error launching sign-in: ${e.message}")
+                                        android.util.Log.e("MainActivity", "Error launching Google sign-in", e)
+                                    }
+                                },
+                                tasks = taskState?.tasks ?: emptyList()
+                            )
                         }
                     }
                 }

@@ -6,6 +6,10 @@ import android.content.IntentSender
 import com.google.android.gms.auth.api.identity.BeginSignInRequest
 import com.google.android.gms.auth.api.identity.BeginSignInRequest.GoogleIdTokenRequestOptions
 import com.google.android.gms.auth.api.identity.SignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.Scope
+import com.google.api.services.calendar.CalendarScopes
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import io.tasky.taskyapp.R
@@ -130,15 +134,22 @@ class GoogleAuthClientImpl(
     }
 
     private fun buildSignInRequest(): BeginSignInRequest {
-        return BeginSignInRequest.Builder()
+        val googleSignInOptions = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestScopes(Scope(CalendarScopes.CALENDAR_READONLY))
+            .requestIdToken(context.getString(R.string.default_web_client_id))
+            .requestEmail()
+            .build()
+
+        val signInRequest = BeginSignInRequest.builder()
             .setGoogleIdTokenRequestOptions(
                 GoogleIdTokenRequestOptions.builder()
                     .setSupported(true)
-                    .setFilterByAuthorizedAccounts(false)
                     .setServerClientId(context.getString(R.string.default_web_client_id))
+                    .setFilterByAuthorizedAccounts(false)
                     .build()
             )
             .setAutoSelectEnabled(true)
             .build()
+        return signInRequest
     }
 }

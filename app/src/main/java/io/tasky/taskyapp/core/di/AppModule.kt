@@ -1,6 +1,7 @@
 package io.tasky.taskyapp.core.di
 
 import android.app.Application
+import android.content.Context
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
@@ -10,7 +11,10 @@ import com.google.firebase.ktx.Firebase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import io.tasky.taskyapp.calendar.data.CalendarRealtimeDatabaseClient
+import io.tasky.taskyapp.calendar.data.CalendarRealtimeDatabaseClientImpl
 import io.tasky.taskyapp.core.util.TaskyToaster
 import io.tasky.taskyapp.core.util.TASK
 import io.tasky.taskyapp.core.util.Toaster
@@ -60,7 +64,21 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun providesToaster(app: Application): Toaster {
-        return TaskyToaster(app.applicationContext)
+    fun providesCalendarRealtimeDatabaseClient(
+        database: FirebaseDatabase
+    ): CalendarRealtimeDatabaseClient {
+        return CalendarRealtimeDatabaseClientImpl(database.getReference("calendar_events"))
+    }
+
+    @Provides
+    @Singleton
+    fun providesApplicationContext(app: Application): Context {
+        return app.applicationContext
+    }
+
+    @Provides
+    @Singleton
+    fun providesToaster(@ApplicationContext app: Context): Toaster {
+        return TaskyToaster(app)
     }
 }

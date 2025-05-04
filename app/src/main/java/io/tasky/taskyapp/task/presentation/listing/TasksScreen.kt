@@ -18,6 +18,7 @@ import androidx.compose.material.SnackbarHostState
 import androidx.compose.material.SnackbarResult
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.rememberModalBottomSheetState
@@ -176,6 +177,12 @@ private fun TasksScaffold(
                             icon = Icons.Default.Home
                         ),
                         MenuItem(
+                            id = "Calendar",
+                            title = stringResource(id = R.string.calendar),
+                            contentDescription = "Calendar Button",
+                            icon = Icons.Default.CalendarMonth
+                        ),
+                        MenuItem(
                             id = "Logout",
                             title = stringResource(id = R.string.logout),
                             contentDescription = "Logout Button",
@@ -187,6 +194,13 @@ private fun TasksScaffold(
                             "Home" -> {
                                 coroutineScope.launch {
                                     drawerState.close()
+                                }
+                            }
+
+                            "Calendar" -> {
+                                coroutineScope.launch {
+                                    drawerState.close()
+                                    navController.navigate(MainScreens.CalendarScreen.name)
                                 }
                             }
 

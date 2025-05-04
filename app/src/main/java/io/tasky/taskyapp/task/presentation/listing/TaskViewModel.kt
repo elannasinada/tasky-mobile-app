@@ -100,6 +100,13 @@ class TaskViewModel @Inject constructor(
                         )
                     }
                 }
+                is Resource.Error -> {
+                    _state.update {
+                        it.copy(
+                            error = result.message ?: "Unknown error"
+                        )
+                    }
+                }
             }
         }.launchIn(viewModelScope)
     }
@@ -147,7 +154,6 @@ class TaskViewModel @Inject constructor(
                     deadlineDate = task.deadlineDate ?: "",
                     deadlineTime = task.deadlineTime ?: "",
                     status = newStatus.name
-                    
                 )
 
                 // If task is completed and it's recurring, create next occurrence

@@ -6,5 +6,6 @@ package io.tasky.taskyapp.core.presentation.navigation
 enum class MainScreens {
     SignInScreen,
     TaskScreen,
-    TaskDetailsScreen;
+    TaskDetailsScreen,
+    CalendarScreen
 }

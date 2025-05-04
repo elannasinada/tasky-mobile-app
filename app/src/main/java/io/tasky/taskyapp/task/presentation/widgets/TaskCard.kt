@@ -245,4 +245,3 @@ private fun getRecurrenceText(task: Task): String {
         else -> "Unknown"
     }
 }
-

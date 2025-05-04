@@ -25,4 +25,6 @@
     <string name="something_went_wrong">Oops! Something went wrong!</string>
     <string name="signed_out">Signed out</string>
     <string name="logout">Logout</string>
+    <string name="default_web_client_id">630987618468-hdilnl883vgvnem4i3glfs8g35q3soi4.apps.googleusercontent.com</string>
+    <string name="calendar">Calendar</string>
 </resources>
