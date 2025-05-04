@@ -90,20 +90,6 @@ fun TaskDetailsScreen(
     val isRecurring = remember { 
         mutableStateOf(false) 
     }
-    
-    // Initialize isRecurring when the task is loaded
-    LaunchedEffect(state.task) {
-        state.task?.let { task ->
-            isRecurring.value = task.isRecurring
-        }
-    }
-    
-    // Update the task whenever isRecurring changes
-    LaunchedEffect(isRecurring.value) {
-        state.task?.let { task ->
-            task.isRecurring = isRecurring.value
-        }
-    }
 
     val recurrencePattern = remember {
         mutableStateOf(state.task?.recurrencePattern ?: RecurrencePattern.DAILY.name)
@@ -117,6 +103,16 @@ fun TaskDetailsScreen(
         mutableStateOf(state.task?.recurrenceEndDate?.replace("-", "/") ?: "")
     }
 
+    LaunchedEffect(state.task?.uuid) {
+        state.task?.let { task ->
+            isRecurring.value = task.isRecurring
+            recurrencePattern.value = task.recurrencePattern ?: RecurrencePattern.DAILY.name
+            recurrenceInterval.value = task.recurrenceInterval
+            recurrenceEndDate.value = task.recurrenceEndDate?.replace("-", "/") ?: ""
+        }
+    }
+
+
     val showRecurrencePatternDropdown = remember { mutableStateOf(false) }
 
     val recurrenceEndDatePicker = LocalContext.current.createDatePickerDialog(
@@ -124,7 +120,6 @@ fun TaskDetailsScreen(
         isSystemInDarkTheme()
     )
 
-    // Update state fields when the task changes
     LaunchedEffect(state.task) {
         state.task?.let { task ->
             title.value = task.title
@@ -133,7 +128,6 @@ fun TaskDetailsScreen(
             time.value = task.deadlineTime ?: ""
             status.value = task.status
 
-            // Ensure recurrence fields are properly updated - force update state
             isRecurring.value = task.isRecurring
             recurrencePattern.value = task.recurrencePattern ?: RecurrencePattern.DAILY.name
             recurrenceInterval.value = task.recurrenceInterval
@@ -390,7 +384,6 @@ fun TaskDetailsScreen(
                 }
             }
 
-            // Improve the logic for determining update vs insert
             DefaultTextButton(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -405,7 +398,7 @@ fun TaskDetailsScreen(
                         date.value,
                         time.value,
                         status.value,
-                        isRecurring.value,
+                        isRecurring.value,  // Pass the current UI state value
                         if (isRecurring.value) recurrencePattern.value else null,
                         if (isRecurring.value) recurrenceInterval.value else 1,
                         if (isRecurring.value && recurrenceEndDate.value.isNotBlank()) recurrenceEndDate.value else null
@@ -418,7 +411,7 @@ fun TaskDetailsScreen(
                         date.value,
                         time.value,
                         status.value,
-                        isRecurring.value,
+                        isRecurring.value,  // Pass the current UI state value
                         if (isRecurring.value) recurrencePattern.value else null,
                         if (isRecurring.value) recurrenceInterval.value else 1,
                         if (isRecurring.value && recurrenceEndDate.value.isNotBlank()) recurrenceEndDate.value else null

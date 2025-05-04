@@ -1,7 +1,9 @@
 package io.tasky.taskyapp.task.presentation.widgets
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -53,14 +55,24 @@ fun TaskCard(
     SwipeableCard(
         onClickSwiped = onClickDelete,
         swipedContent = {
-            Icon(
-                imageVector = Icons.Default.Delete,
-                contentDescription = "Delete",
-                tint = MaterialTheme.colorScheme.onErrorContainer,
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp)
-            )
+                    .padding(end = 16.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.error)
+                )
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete",
+                    tint = Color.White,
+                    modifier = Modifier.size(30.dp)
+                )
+            }
         },
         onClickCard = onClickCard,
         cardContent = {
@@ -233,3 +245,4 @@ private fun getRecurrenceText(task: Task): String {
         else -> "Unknown"
     }
 }
+

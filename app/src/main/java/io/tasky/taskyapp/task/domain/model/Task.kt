@@ -31,7 +31,7 @@ data class Task(
                 deadlineDate = hashMap["deadlineDate"]?.toString(),
                 deadlineTime = hashMap["deadlineTime"]?.toString(),
                 status = hashMap["status"]?.toString() ?: TaskStatus.PENDING.name,
-                isRecurring = hashMap["isRecurring"]?.toString()?.toBoolean() ?: false,
+                isRecurring = hashMap["recurring"]?.toString()?.toBoolean() ?: false,
                 recurrencePattern = hashMap["recurrencePattern"]?.toString(),
                 recurrenceInterval = when (val interval = hashMap["recurrenceInterval"]) {
                     is Number -> interval.toInt()
