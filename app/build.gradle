@@ -91,6 +91,14 @@ dependencies {
     implementation 'com.google.http-client:google-http-client-android:1.42.3'
     implementation 'com.google.http-client:google-http-client-gson:1.42.3'
 
+    // TensorFlow Lite
+    implementation 'org.tensorflow:tensorflow-lite:2.8.0'
+    implementation 'org.tensorflow:tensorflow-lite-support:0.4.0'
+
+    // Firebase ML Kit
+    implementation 'com.google.firebase:firebase-ml-natural-language:22.0.1'
+    implementation 'com.google.firebase:firebase-ml-natural-language-language-id-model:20.0.8'
+    
     implementation 'androidx.core:core-ktx:1.10.0'
     implementation 'androidx.compose.material3:material3:1.1.0-rc01'
     implementation "androidx.compose.ui:ui-text-google-fonts:$compose_version"

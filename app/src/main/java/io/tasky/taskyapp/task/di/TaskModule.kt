@@ -1,5 +1,7 @@
 package io.tasky.taskyapp.task.di
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -10,6 +12,7 @@ import io.tasky.taskyapp.task.domain.repository.TaskRepository
 import io.tasky.taskyapp.task.domain.use_cases.DeleteTaskUseCase
 import io.tasky.taskyapp.task.domain.use_cases.GetTasksUseCase
 import io.tasky.taskyapp.task.domain.use_cases.InsertTaskUseCase
+import io.tasky.taskyapp.task.domain.use_cases.PredictTaskPriorityUseCase
 import io.tasky.taskyapp.task.domain.use_cases.TaskUseCases
 import io.tasky.taskyapp.task.domain.use_cases.UpdateTaskUseCase
 
@@ -24,11 +27,20 @@ object TaskModule {
     }
 
     @Provides
-    fun providesTaskUseCases(repository: TaskRepository) =
-        TaskUseCases(
-            deleteTaskUseCase = DeleteTaskUseCase(repository),
-            getTasksUseCase = GetTasksUseCase(repository),
-            insertTaskUseCase = InsertTaskUseCase(repository),
-            updateTaskUseCase = UpdateTaskUseCase(repository)
-        )
+    fun providesTaskUseCases(
+        repository: TaskRepository,
+        @ApplicationContext context: Context
+    ) = TaskUseCases(
+        deleteTaskUseCase = DeleteTaskUseCase(repository),
+        getTasksUseCase = GetTasksUseCase(repository),
+        insertTaskUseCase = InsertTaskUseCase(
+            repository = repository, 
+            predictTaskPriorityUseCase = PredictTaskPriorityUseCase(context)
+        ),
+        updateTaskUseCase = UpdateTaskUseCase(
+            repository = repository,
+            predictTaskPriorityUseCase = PredictTaskPriorityUseCase(context)
+        ),
+        predictTaskPriorityUseCase = PredictTaskPriorityUseCase(context)
+    )
 }

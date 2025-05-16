@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -263,11 +264,18 @@ private fun TasksScaffold(
                 )
 
                 LazyColumn(
-                    modifier = Modifier.padding(top = 16.dp)
+                    modifier = Modifier
+                        .padding(top = 16.dp, start = 16.dp, end = 16.dp)
+                        .fillMaxWidth()
+                        .weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (state.loading) {
                         items(3) {
-                            TaskShimmerCard()
+                            TaskShimmerCard(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                            )
                         }
                     } else {
                         itemsIndexed(state.tasks) { index, task ->
@@ -294,8 +302,8 @@ private fun TasksScaffold(
                                     }
                                 },
                                 modifier = Modifier.padding(
-                                    top = if (index == 0) 16.dp else 0.dp,
-                                    bottom = 8.dp
+                                    top = if (index == 0) 8.dp else 0.dp,
+                                    bottom = 0.dp
                                 )
                             )
                         }

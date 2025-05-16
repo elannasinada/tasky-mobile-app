@@ -176,9 +176,58 @@ private fun TaskCardContent(task: Task) {
                             )
                         }
 
-                        if (task.isRecurring) {
-                            Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
 
+                        // Priority indicator
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            when (task.priority) {
+                                2 -> {
+                                    Card(
+                                        modifier = Modifier.size(8.dp),
+                                        shape = RoundedCornerShape(4.dp),
+                                        colors = CardDefaults.cardColors(containerColor = Color.Red)
+                                    ) {}
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "High priority",
+                                        fontSize = 10.sp,
+                                        color = Color.Red
+                                    )
+                                }
+                                1 -> {
+                                    Card(
+                                        modifier = Modifier.size(8.dp),
+                                        shape = RoundedCornerShape(4.dp),
+                                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFA500)) // Orange
+                                    ) {}
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Medium priority",
+                                        fontSize = 10.sp,
+                                        color = Color(0xFFFFA500) // Orange
+                                    )
+                                }
+                                else -> {
+                                    Card(
+                                        modifier = Modifier.size(8.dp),
+                                        shape = RoundedCornerShape(4.dp),
+                                        colors = CardDefaults.cardColors(containerColor = Color.Green)
+                                    ) {}
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Low priority",
+                                        fontSize = 10.sp,
+                                        color = Color.Green
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        if (task.isRecurring) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {

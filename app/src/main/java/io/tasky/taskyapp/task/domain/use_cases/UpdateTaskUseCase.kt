@@ -8,7 +8,8 @@ import io.tasky.taskyapp.task.domain.repository.TaskRepository
  * Updates an existent task.
  */
 class UpdateTaskUseCase(
-    private val repository: TaskRepository
+    private val repository: TaskRepository,
+    private val predictTaskPriorityUseCase: PredictTaskPriorityUseCase? = null
 ) {
     /**
      * Updates an existent task.
@@ -46,20 +47,29 @@ class UpdateTaskUseCase(
         if (taskType.isBlank())
             throw Exception("You can't save without a task type")
 
+        // Create the updated task
+        val updatedTask = task.copy(
+            title = title,
+            description = description,
+            taskType = taskType,
+            deadlineDate = deadlineDate.replace("/", "-"),
+            deadlineTime = deadlineTime,
+            status = status,
+            isRecurring = isRecurring,
+            recurrencePattern = recurrencePattern,
+            recurrenceInterval = recurrenceInterval,
+            recurrenceEndDate = recurrenceEndDate
+        )
+
+        // Predict priority if predictor is available
+        val taskWithPriority = predictTaskPriorityUseCase?.let { predictor ->
+            val priority = predictor.invoke(updatedTask)
+            updatedTask.copy(priority = priority)
+        } ?: updatedTask
+        
         repository.insertTask(
             userData = userData,
-            task = task.copy(
-                title = title,
-                description = description,
-                taskType = taskType,
-                deadlineDate = deadlineDate.replace("/", "-"),
-                deadlineTime = deadlineTime,
-                status = status,
-                isRecurring = isRecurring,
-                recurrencePattern = recurrencePattern,
-                recurrenceInterval = recurrenceInterval,
-                recurrenceEndDate = recurrenceEndDate
-            )
+            task = taskWithPriority
         )
     }
 }

@@ -17,7 +17,8 @@ data class Task(
     var isRecurring: Boolean = false,
     var recurrencePattern: String? = null, 
     var recurrenceInterval: Int = 1, 
-    var recurrenceEndDate: String? = null
+    var recurrenceEndDate: String? = null,
+    var priority: Int = 0 // 0 = Low, 1 = Medium, 2 = High
 ) {
     companion object {
         fun fromJson(json: String): Task = Gson().fromJson(json, Task::class.java)
@@ -38,10 +39,24 @@ data class Task(
                     is String -> interval.toIntOrNull() ?: 1
                     else -> 1
                 },
-                recurrenceEndDate = hashMap["recurrenceEndDate"]?.toString()
+                recurrenceEndDate = hashMap["recurrenceEndDate"]?.toString(),
+                priority = when (val priority = hashMap["priority"]) {
+                    is Number -> priority.toInt()
+                    is String -> priority.toIntOrNull() ?: 0
+                    else -> 0
+                }
             )
         }
     }
 
     fun toJson() = Gson().toJson(this).toString()
+
+    /**
+     * Creates a copy of this task with the specified priority level.
+     * @param priority The priority level (0=low, 1=medium, 2=high)
+     * @return A new Task with the updated priority
+     */
+    fun withPriority(priority: Int): Task {
+        return this.copy(priority = priority)
+    }
 }

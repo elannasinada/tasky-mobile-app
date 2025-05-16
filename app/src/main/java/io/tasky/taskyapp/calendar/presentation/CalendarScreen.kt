@@ -126,35 +126,18 @@ fun CalendarScreen(
             )
         },
         floatingActionButton = {
-            Column(horizontalAlignment = Alignment.End) {
-                // Sync tasks button
-                FloatingActionButton(
-                    onClick = { 
-                        viewModel.showToast("Syncing tasks to Google Calendar...")
-                        viewModel.syncTasksToCalendar(tasks) 
-                    },
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Sync,
-                        contentDescription = "Sync Tasks to Calendar"
-                    )
-                }
-                
-                // Sync calendar button
-                FloatingActionButton(
-                    onClick = { 
-                        viewModel.showToast("Refreshing from Google Calendar...")  
-                        viewModel.syncCalendarEvents(tasks) 
-                    },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Sync Calendar"
-                    )
-                }
+            FloatingActionButton(
+                onClick = { 
+                    viewModel.showToast("Syncing calendar and tasks...")
+                    // Combined refresh - syncs calendar events and tasks in one operation
+                    viewModel.refreshCalendarAndTasks(tasks)
+                },
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Refresh Calendar"
+                )
             }
         }
     ) { padding ->
@@ -276,8 +259,9 @@ fun CalendarScreen(
                                 
                                 Button(
                                     onClick = { 
-                                        viewModel.showToast("Refreshing calendar...")
-                                        viewModel.loadCalendarEvents(tasks)
+                                        viewModel.showToast("Syncing calendar and tasks...")
+                                        // Combined refresh - syncs calendar events and tasks in one operation
+                                        viewModel.refreshCalendarAndTasks(tasks)
                                     }
                                 ) {
                                     Text("Refresh Calendar")

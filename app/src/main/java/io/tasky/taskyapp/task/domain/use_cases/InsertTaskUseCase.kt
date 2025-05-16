@@ -9,7 +9,8 @@ import io.tasky.taskyapp.task.domain.repository.TaskRepository
  * Created a new task.
  */
 class InsertTaskUseCase(
-    private val repository: TaskRepository
+    private val repository: TaskRepository,
+    private val predictTaskPriorityUseCase: PredictTaskPriorityUseCase? = null
 ) {
     /**
      * Created a new task.
@@ -45,20 +46,30 @@ class InsertTaskUseCase(
         if (taskType.isBlank())
             throw Exception("You can't save without a task type")
 
+        // Create the task
+        val task = Task(
+            title = title,
+            description = description,
+            taskType = taskType,
+            deadlineDate = deadlineDate.replace("/", "-"),
+            deadlineTime = deadlineTime,
+            status = status.toString(),
+            isRecurring = isRecurring,
+            recurrencePattern = recurrencePattern,
+            recurrenceInterval = recurrenceInterval,
+            recurrenceEndDate = recurrenceEndDate
+        )
+        
+        // Predict priority if predictor is available
+        val taskWithPriority = predictTaskPriorityUseCase?.let { predictor ->
+            val priority = predictor.invoke(task)
+            task.copy(priority = priority)
+        } ?: task
+        
+        // Insert the task with priority
         repository.insertTask(
             userData = userData,
-            task = Task(
-                title = title,
-                description = description,
-                taskType = taskType,
-                deadlineDate = deadlineDate.replace("/", "-"),
-                deadlineTime = deadlineTime,
-                status = status.toString(),
-                isRecurring = isRecurring,
-                recurrencePattern = recurrencePattern,
-                recurrenceInterval = recurrenceInterval,
-                recurrenceEndDate = recurrenceEndDate
-            )
+            task = taskWithPriority
         )
     }
 }

@@ -86,10 +86,13 @@ class TaskViewModel @Inject constructor(
                     result.data?.let { tasks ->
                         this.tasks.addAll(tasks)
 
-                        _state.update {
-                            it.copy(
-                                tasks = tasks,
-                            )
+                        // Analyze tasks with the TensorFlow model to determine priorities
+                        predictTaskPriorities(tasks) { prioritizedTasks ->
+                            _state.update {
+                                it.copy(
+                                    tasks = prioritizedTasks,
+                                )
+                            }
                         }
                     }
                 }
@@ -241,6 +244,27 @@ class TaskViewModel @Inject constructor(
         } catch (e: Exception) {
             return false
         }
+    }
+
+    /**
+     * Analyzes tasks using the TensorFlow model to predict priority levels.
+     * 
+     * @param tasks The tasks to analyze
+     * @param callback Function that receives the tasks with updated priorities
+     */
+    private fun predictTaskPriorities(tasks: List<Task>, callback: (List<Task>) -> Unit) {
+        if (tasks.isEmpty()) {
+            callback(emptyList())
+            return
+        }
+        
+        val updatedTasks = tasks.map { task ->
+            val priority = useCases.predictTaskPriorityUseCase(task)
+            task.withPriority(priority)
+        }
+        
+        // Sort tasks by priority (high to low)
+        callback(updatedTasks.sortedByDescending { it.priority })
     }
 
     fun clearState() {

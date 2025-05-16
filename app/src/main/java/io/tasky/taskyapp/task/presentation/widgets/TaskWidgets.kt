@@ -39,9 +39,11 @@ import io.tasky.taskyapp.ui.theme.Blue70
 import io.tasky.taskyapp.ui.theme.Purple80
 
 @Composable
-fun TaskShimmerCard() {
+fun TaskShimmerCard(
+    modifier: Modifier = Modifier
+) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {

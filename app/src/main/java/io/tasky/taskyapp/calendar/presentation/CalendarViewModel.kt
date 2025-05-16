@@ -25,9 +25,9 @@ import io.tasky.taskyapp.calendar.data.DateEvents
 import io.tasky.taskyapp.core.util.Resource
 import io.tasky.taskyapp.core.util.Toaster
 import io.tasky.taskyapp.task.domain.model.Task
-import io.tasky.taskyapp.task.domain.model.TaskStatus
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -133,13 +133,14 @@ class CalendarViewModel @Inject constructor(
                     when (result) {
                         is Resource.Success -> {
                             val events = result.data ?: emptyList()
+                            val uniqueEvents = events.distinctBy { it.id }
                             state = state.copy(
-                                calendarEvents = events,
+                                calendarEvents = uniqueEvents,
                                 isSyncing = false,
                                 error = null
                             )
-                            // Update the date events with the combined data
-                            updateDateEvents(events, tasks)
+                            val dedupedTasks = tasks.distinctBy { it.uuid }
+                            updateDateEvents(uniqueEvents, dedupedTasks)
                             _eventFlow.emitSafe(UiEvent.ShowToast("Calendar synced successfully"))
                         }
                         is Resource.Error -> {
@@ -176,7 +177,17 @@ class CalendarViewModel @Inject constructor(
                     return@launch
                 }
 
-                calendarRepository.syncTasksToCalendar(account, tasks).collectLatest { result ->
+                val existingTaskIds = mutableSetOf<String>()
+                state.dateEvents.forEach { dateEvent ->
+                    dateEvent.items.filterIsInstance<CalendarItem.TaskItem>()
+                        .forEach { taskItem ->
+                            existingTaskIds.add(taskItem.task.uuid)
+                        }
+                }
+                
+                val tasksToSync = tasks.filter { it.uuid !in existingTaskIds }
+                
+                calendarRepository.syncTasksToCalendar(account, tasksToSync).collectLatest { result ->
                     when (result) {
                         is Resource.Success -> {
                             val count = result.data ?: 0
@@ -215,6 +226,89 @@ class CalendarViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Combined refresh function that syncs both calendar events and tasks
+     * This prevents creating duplicates by sequencing the operations properly
+     */
+    fun refreshCalendarAndTasks(tasks: List<Task>) {
+        viewModelScope.launch {
+            try {
+                state = state.copy(isSyncing = true)
+                
+                // Get the GoogleSignInAccount
+                val account = GoogleSignIn.getLastSignedInAccount(context)
+                
+                // Check if user has Google account and calendar permissions
+                if (account == null || !hasCalendarPermission(account)) {
+                    requestCalendarPermission()
+                    state = state.copy(isSyncing = false)
+                    return@launch
+                }
+                
+                showToast("Synchronisation du calendrier...")
+                
+                try {
+                    // Step 1: Get events from calendar
+                    val events = calendarRepository.getCalendarEvents(account)
+                    val uniqueEvents = events.distinctBy { it.id }
+                    
+                    // Important: Completely deduplicate input tasks first
+                    val dedupedTasks = tasks.distinctBy { it.uuid }
+                    
+                    // Step 2: Generate properly deduplicated dateEvents
+                    val dateEvents = calendarRepository.getDateEvents(uniqueEvents, dedupedTasks)
+                    
+                    // Step 3: Update state with deduplicated data
+                    state = state.copy(
+                        calendarEvents = uniqueEvents,
+                        dateEvents = dateEvents,  // Use properly deduplicated dateEvents
+                        isSyncing = false,
+                        error = null
+                    )
+                    
+                    // Step 4: Find tasks that need syncing to Google Calendar
+                    val existingTaskIds = mutableSetOf<String>()
+                    dateEvents.forEach { dateEvent ->
+                        dateEvent.items.filterIsInstance<CalendarItem.TaskItem>()
+                            .forEach { taskItem ->
+                                existingTaskIds.add(taskItem.task.uuid)
+                            }
+                    }
+                    
+                    val tasksToSync = dedupedTasks.filter { it.uuid !in existingTaskIds }
+                    
+                    // Step 5: Sync tasks if needed
+                    if (tasksToSync.isNotEmpty()) {
+                        showToast("Synchronisation de ${tasksToSync.size} nouvelles tâches...")
+                        calendarRepository.syncTasksToCalendar(account, tasksToSync)
+                            .collect { result ->
+                                if (result is Resource.Success) {
+                                    val count = result.data ?: 0
+                                    showToast("$count tâches synchronisées")
+                                }
+                            }
+                    } else {
+                        showToast("Aucune nouvelle tâche à synchroniser")
+                    }
+                    
+                    // IMPORTANT: After refreshing, explicitly reselect today's date to update the view
+                    // This makes sure we use the same filtering logic used by the date selection
+                    selectDate(state.selectedDate)
+                    
+                    showToast("Synchronisation terminée")
+                } catch (e: Exception) {
+                    showToast("Erreur: ${e.message}")
+                }
+                
+                state = state.copy(isSyncing = false)
+                
+            } catch (e: Exception) {
+                state = state.copy(isSyncing = false, error = e.message)
+                _eventFlow.emitSafe(UiEvent.ShowToast(e.message ?: "Unknown error occurred"))
+            }
+        }
+    }
+
     fun loadCalendarEvents(tasks: List<Task> = emptyList()) {
         viewModelScope.launch {
             try {
@@ -239,68 +333,26 @@ class CalendarViewModel @Inject constructor(
                     return@launch
                 }
                 
-                // Always show which account we're trying
-                showToast("👤 Using Google account: ${account.email}")
+                showToast("Compte: ${account.email}")
                 
-                // EMERGENCY MODE: Skip permission check and go straight to loading events
                 try {
-                    showToast("📲 Retrieving events from Google Calendar...")
-                    
-                    // Direct call to repository - force it to work
                     val events = calendarRepository.getCalendarEvents(account)
+                    val uniqueEvents = events.distinctBy { it.id }
+                    val dedupedTasks = tasks.distinctBy { it.uuid }
+                    val dateEvents = calendarRepository.getDateEvents(uniqueEvents, dedupedTasks)
                     
-                    // Update the date events with the combined data
-                    val dateEvents = calendarRepository.getDateEvents(events, tasks).toMutableList()
-                    val todayEvents = dateEvents.find { it.date == today }
-    
-                    // Handle today's events and add missing past tasks explicitly
-                    if (todayEvents == null) {
-                        val pastTasks = tasks.filter { task ->
-                            // Try multiple date formats to handle both MM-dd-yyyy and dd-MM-yyyy
-                            val taskDate = try {
-                                val dateStr = task.deadlineDate ?: ""
-                                // First try the primary formats
-                                try {
-                                    LocalDate.parse(dateStr, DateTimeFormatter.ofPattern("yyyy-MM-dd"))
-                                } catch (e: Exception) {
-                                    try {
-                                        LocalDate.parse(dateStr, DateTimeFormatter.ofPattern("MM-dd-yyyy"))
-                                    } catch (e2: Exception) {
-                                        try {
-                                            LocalDate.parse(dateStr, DateTimeFormatter.ofPattern("dd-MM-yyyy"))
-                                        } catch (e3: Exception) {
-                                            null
-                                        }
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                null
-                            }
-                            taskDate != null && (taskDate == today || taskDate.isBefore(today))
-                        }.map { CalendarItem.TaskItem(it) }
-                        
-                        if (pastTasks.isNotEmpty()) {
-                            toaster.showToast("Including past tasks on today's calendar")
-                            dateEvents.add(
-                                DateEvents(date = today, items = pastTasks)
-                            )
-                        }
-                    }
-    
                     state = state.copy(
-                        calendarEvents = events,
+                        calendarEvents = uniqueEvents,
                         dateEvents = dateEvents,
                         isLoading = false,
                         showGoogleSignInPrompt = false
                     )
-    
-                    // Refresh today's display explicitly
+
                     selectDate(today)
                 } catch (e: Exception) {
-                    // Handle calendar retrieval errors but don't crash
-                    toaster.showToast("❌ Error loading events: ${e.message}")
+                    toaster.showToast("Erreur: ${e.message}")
                     state = state.copy(
-                        error = "Calendar error: ${e.message}",
+                        error = "Erreur du calendrier: ${e.message}",
                         isLoading = false,
                         showGoogleSignInPrompt = false
                     )
@@ -313,19 +365,12 @@ class CalendarViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Updates the date events and selected date items
-     */
     private fun updateDateEvents(events: List<CalendarEvent>, tasks: List<Task>) {
         try {
-            // Use our new repository methods to get the date events
             val dateEvents = calendarRepository.getDateEvents(events, tasks).toMutableList()
-            
-            // Get items for the selected date
             val selectedDateStr = state.selectedDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
             val selectedDateEvents = dateEvents.find { it.date == state.selectedDate }?.items ?: emptyList()
             
-            // Debug output of tasks for today
             val todayStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
             val today = LocalDate.now()
             val todayEvents = dateEvents.find { it.date == today }?.items ?: emptyList()
@@ -394,32 +439,24 @@ class CalendarViewModel @Inject constructor(
         
         viewModelScope.launch {
             try {
-                // Updated to show which date is selected
-                val formattedDate = date.format(DateTimeFormatter.ofPattern("MM-dd-yyyy"))
-                showToast("Viewing: $formattedDate")
+                val formattedDate = date.format(DateTimeFormatter.ofPattern("dd-MM-yyyy"))
+                showToast("Date: $formattedDate")
                 
                 state = state.copy(selectedDate = date)
                 val account = GoogleSignIn.getLastSignedInAccount(context)
                 
-                // Add additional search for tasks that match this date in different formats
                 val dateFormats = listOf(
                     date.format(DateTimeFormatter.ofPattern("MM-dd-yyyy")),
                     date.format(DateTimeFormatter.ofPattern("dd-MM-yyyy")),
                     date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
                 )
 
-                // Check for tasks which might match this date in any format
                 val allTasks = state.dateEvents.flatMap { dateEvent ->
                     dateEvent.items.filterIsInstance<CalendarItem.TaskItem>().map { it.task }
-                }
-                
-                // Find tasks whose dates match the selected date (in any format)
+                }.distinctBy { it.uuid } // Deduplicate tasks here
+
                 val tasksForSelectedDate = allTasks.filter { task ->
                     dateFormats.contains(task.deadlineDate)
-                }
-                
-                if (tasksForSelectedDate.isNotEmpty()) {
-                    showToast("Found ${tasksForSelectedDate.size} tasks with matching date")
                 }
                 
                 if (account != null && hasCalendarPermission(account)) {
@@ -430,21 +467,33 @@ class CalendarViewModel @Inject constructor(
                     ).collectLatest { result ->
                         when (result) {
                             is Resource.Success -> {
-                                var items = result.data?.toMutableList() ?: mutableListOf()
+                                // Create a tracking set for task UUIDs to avoid duplicates
+                                val processedTaskIds = mutableSetOf<String>()
+                                val finalItems = mutableListOf<CalendarItem>()
                                 
-                                // Ensure we include any tasks with matching date strings
-                                val existingIds = items.filterIsInstance<CalendarItem.TaskItem>()
-                                    .map { it.task.uuid }.toSet()
+                                // First add all Google Calendar events
+                                result.data?.filterIsInstance<CalendarItem.GoogleEventItem>()?.let {
+                                    finalItems.addAll(it)
+                                }
                                 
-                                // Add any tasks we found with matching date strings
+                                // Then add tasks from the repository result, tracking IDs
+                                result.data?.filterIsInstance<CalendarItem.TaskItem>()?.forEach { taskItem ->
+                                    if (!processedTaskIds.contains(taskItem.task.uuid)) {
+                                        finalItems.add(taskItem)
+                                        processedTaskIds.add(taskItem.task.uuid)
+                                    }
+                                }
+                                
+                                // Finally add any tasks with matching date strings that weren't already added
                                 tasksForSelectedDate.forEach { task ->
-                                    if (task.uuid !in existingIds) {
-                                        items.add(CalendarItem.TaskItem(task))
+                                    if (!processedTaskIds.contains(task.uuid)) {
+                                        finalItems.add(CalendarItem.TaskItem(task))
+                                        processedTaskIds.add(task.uuid)
                                     }
                                 }
                                 
                                 // Sort and handle conflicts
-                                val sortedItems = sortAndHandleConflicts(items)
+                                val sortedItems = sortAndHandleConflicts(finalItems)
                                 
                                 state = state.copy(selectedDateItems = sortedItems)
                             }
@@ -458,40 +507,46 @@ class CalendarViewModel @Inject constructor(
                     }
                 } else {
                     // Fall back to our cached data if we don't have account access
-                    val selectedDateEvents = state.dateEvents.find { it.date == date }?.items?.toMutableList() 
-                        ?: mutableListOf()
+                    val processedTaskIds = mutableSetOf<String>()
+                    val finalItems = mutableListOf<CalendarItem>()
                     
-                    // Add any tasks with matching date strings
-                    val existingIds = selectedDateEvents.filterIsInstance<CalendarItem.TaskItem>()
-                        .map { it.task.uuid }.toSet()
+                    // First add any items already in our cached data
+                    state.dateEvents.find { it.date == date }?.items?.forEach { item ->
+                        if (item is CalendarItem.TaskItem) {
+                            if (!processedTaskIds.contains(item.task.uuid)) {
+                                finalItems.add(item)
+                                processedTaskIds.add(item.task.uuid)
+                            }
+                        } else {
+                            // Non-task items can be added directly
+                            finalItems.add(item)
+                        }
+                    }
                     
+                    // Then add any tasks with matching date strings that weren't already added
                     tasksForSelectedDate.forEach { task ->
-                        if (task.uuid !in existingIds) {
-                            selectedDateEvents.add(CalendarItem.TaskItem(task))
+                        if (!processedTaskIds.contains(task.uuid)) {
+                            finalItems.add(CalendarItem.TaskItem(task))
+                            processedTaskIds.add(task.uuid)
                         }
                     }
                     
                     // Sort and handle conflicts
-                    val sortedItems = sortAndHandleConflicts(selectedDateEvents)
+                    val sortedItems = sortAndHandleConflicts(finalItems)
                     
                     state = state.copy(selectedDateItems = sortedItems)
                 }
             } catch (e: Exception) {
                 state = state.copy(error = e.message)
-                showToast("Failed to load events for selected date: ${e.message}")
+                showToast("Erreur lors du chargement des événements: ${e.message}")
             }
         }
     }
 
-    /**
-     * Sorts items by time and handles potential conflicts
-     */
     private fun sortAndHandleConflicts(items: List<CalendarItem>): List<CalendarItem> {
-        // First, separate Google Events and Tasks
         val googleEvents = items.filterIsInstance<CalendarItem.GoogleEventItem>()
         val tasks = items.filterIsInstance<CalendarItem.TaskItem>()
         
-        // Sort Google Events by start time
         val sortedGoogleEvents = googleEvents.sortedBy { event ->
             try {
                 val time = event.event.startTime.toLongOrNull()

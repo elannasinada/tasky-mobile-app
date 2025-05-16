@@ -8,4 +8,5 @@ data class TaskUseCases(
     val getTasksUseCase: GetTasksUseCase,
     val insertTaskUseCase: InsertTaskUseCase,
     val updateTaskUseCase: UpdateTaskUseCase,
+    val predictTaskPriorityUseCase: PredictTaskPriorityUseCase
 )
