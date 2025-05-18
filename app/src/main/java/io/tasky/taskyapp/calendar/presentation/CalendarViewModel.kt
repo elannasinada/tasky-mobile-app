@@ -5,8 +5,6 @@ import android.content.Intent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.Color
-import androidx.compose.material3.MaterialTheme
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -75,30 +73,21 @@ class CalendarViewModel @Inject constructor(
                 val task = GoogleSignIn.getSignedInAccountFromIntent(data)
                 val account = task.getResult(ApiException::class.java)
                 if (account != null) {
-                    showToast("Successfully signed in with Google: ${account.email}")
+                    _eventFlow.emitSafe(UiEvent.ShowToast("Connected to Google Calendar successfully"))
                     
-                    // FORCE the calendar permission check to succeed
-                    if (!account.grantedScopes.isNullOrEmpty()) {
-                        showToast("Found ${account.grantedScopes?.size} permission scopes")
-                        loadCalendarEvents()
-                    } else {
-                        showToast("No permissions granted. Requesting calendar permissions...")
-                        requestCalendarPermission()
-                    }
+                    // Silently refresh calendar data
+                    refreshCalendarAndTasks(emptyList(), showToasts = false)
                 } else {
-                    showToast("Account was null after sign-in")
                     state = state.copy(showGoogleSignInPrompt = true)
                 }
             } catch (e: Exception) {
                 if (e is ApiException && e.statusCode == 12501) {
                     // Error 12501 is "user canceled" - try to recover by using any available account
-                    _eventFlow.emitSafe(UiEvent.ShowToast("Sign-in was canceled. Trying fallback..."))
                     
                     // Try to use last signed-in account
                     val lastAccount = GoogleSignIn.getLastSignedInAccount(context)
                     if (lastAccount != null) {
-                        _eventFlow.emitSafe(UiEvent.ShowToast("Using last signed-in account: ${lastAccount.email}"))
-                        loadCalendarEvents()
+                        refreshCalendarAndTasks(emptyList(), showToasts = false)
                     } else {
                         state = state.copy(
                             error = "No Google account available. Please try signing in again.",
@@ -108,7 +97,7 @@ class CalendarViewModel @Inject constructor(
                 } else {
                     // Other error
                     state = state.copy(error = "Error: ${e.message}")
-                    _eventFlow.emitSafe(UiEvent.ShowToast(e.message ?: "Failed to sign in with Google"))
+                    _eventFlow.emitSafe(UiEvent.ShowToast("Failed to sign in with Google"))
                 }
             }
         }
@@ -230,7 +219,7 @@ class CalendarViewModel @Inject constructor(
      * Combined refresh function that syncs both calendar events and tasks
      * This prevents creating duplicates by sequencing the operations properly
      */
-    fun refreshCalendarAndTasks(tasks: List<Task>) {
+    fun refreshCalendarAndTasks(tasks: List<Task>, showToasts: Boolean = true) {
         viewModelScope.launch {
             try {
                 state = state.copy(isSyncing = true)
@@ -245,7 +234,9 @@ class CalendarViewModel @Inject constructor(
                     return@launch
                 }
                 
-                showToast("Synchronisation du calendrier...")
+                if (showToasts) {
+                    showToast("Synchronizing calendar...")
+                }
                 
                 try {
                     // Step 1: Get events from calendar
@@ -278,33 +269,40 @@ class CalendarViewModel @Inject constructor(
                     val tasksToSync = dedupedTasks.filter { it.uuid !in existingTaskIds }
                     
                     // Step 5: Sync tasks if needed
-                    if (tasksToSync.isNotEmpty()) {
-                        showToast("Synchronisation de ${tasksToSync.size} nouvelles tâches...")
+                    if (tasksToSync.isNotEmpty() && showToasts) {
                         calendarRepository.syncTasksToCalendar(account, tasksToSync)
                             .collect { result ->
-                                if (result is Resource.Success) {
+                                if (result is Resource.Success && showToasts) {
                                     val count = result.data ?: 0
-                                    showToast("$count tâches synchronisées")
+                                    if (count > 0) {
+                                        showToast("${count} tasks synchronized")
+                                    }
                                 }
                             }
-                    } else {
-                        showToast("Aucune nouvelle tâche à synchroniser")
+                    } else if (showToasts) {
+                        showToast("No new tasks to synchronize")
                     }
                     
                     // IMPORTANT: After refreshing, explicitly reselect today's date to update the view
                     // This makes sure we use the same filtering logic used by the date selection
                     selectDate(state.selectedDate)
                     
-                    showToast("Synchronisation terminée")
+                    if (showToasts) {
+                        showToast("Calendar synchronized successfully")
+                    }
                 } catch (e: Exception) {
-                    showToast("Erreur: ${e.message}")
+                    if (showToasts) {
+                        showToast("Error: ${e.message}")
+                    }
                 }
                 
                 state = state.copy(isSyncing = false)
                 
             } catch (e: Exception) {
                 state = state.copy(isSyncing = false, error = e.message)
-                _eventFlow.emitSafe(UiEvent.ShowToast(e.message ?: "Unknown error occurred"))
+                if (showToasts) {
+                    _eventFlow.emitSafe(UiEvent.ShowToast(e.message ?: "Unknown error occurred"))
+                }
             }
         }
     }
@@ -318,22 +316,17 @@ class CalendarViewModel @Inject constructor(
                     isLoading = true,
                     selectedDate = today  // Make sure we select today by default
                 )
-                
-                showToast(" EMERGENCY MODE: Loading calendar events...")
 
                 // Get the GoogleSignInAccount - always try to use whatever account we have
                 val account = GoogleSignIn.getLastSignedInAccount(context)
                 if (account == null) {
                     // No account found, show sign-in prompt
-                    showToast("❌ No Google account found. Please sign in.")
                     state = state.copy(
                         isLoading = false,
                         showGoogleSignInPrompt = true
                     )
                     return@launch
                 }
-                
-                showToast("Compte: ${account.email}")
                 
                 try {
                     val events = calendarRepository.getCalendarEvents(account)
@@ -350,9 +343,8 @@ class CalendarViewModel @Inject constructor(
 
                     selectDate(today)
                 } catch (e: Exception) {
-                    toaster.showToast("Erreur: ${e.message}")
                     state = state.copy(
-                        error = "Erreur du calendrier: ${e.message}",
+                        error = "Calendar error: ${e.message}",
                         isLoading = false,
                         showGoogleSignInPrompt = false
                     )
@@ -360,7 +352,6 @@ class CalendarViewModel @Inject constructor(
 
             } catch (e: Exception) {
                 state = state.copy(isLoading = false, error = e.message)
-                showToast("❌ " + (e.message ?: "Unknown error occurred"))
             }
         }
     }

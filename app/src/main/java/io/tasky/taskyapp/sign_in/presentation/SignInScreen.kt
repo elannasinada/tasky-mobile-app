@@ -106,7 +106,7 @@ private fun LoginButtonsColumn(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 8.dp),
-            text = stringResource(id = R.string.login),
+            text = stringResource(id = R.string.sign_in),
             onClick = {
                 coroutineScope.launch {
                     isLogin.value = true
@@ -118,7 +118,7 @@ private fun LoginButtonsColumn(
         DefaultTextButton(
             modifier = Modifier
                 .fillMaxWidth(),
-            text = stringResource(id = R.string.sign_in),
+            text = stringResource(id = R.string.sign_up),
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
             contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
             onClick = {

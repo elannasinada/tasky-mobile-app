@@ -4,6 +4,7 @@ import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Context
 import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.compose.runtime.MutableState
 import io.tasky.taskyapp.R
 import java.util.Calendar
@@ -54,10 +55,16 @@ fun Context.createDatePickerDialog(
     }
 }
 
-fun Context.showToast(message: String) {
-    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+/**
+ * Extension function to show a toast message with the specified text.
+ */
+fun Context.showToast(message: String, duration: Int = Toast.LENGTH_SHORT) {
+    Toast.makeText(this, message, duration).show()
 }
 
-fun Context.showToast(id: Int) {
-    Toast.makeText(this, id, Toast.LENGTH_LONG).show()
+/**
+ * Extension function to show a toast message from a string resource.
+ */
+fun Context.showToast(@StringRes resId: Int, duration: Int = Toast.LENGTH_SHORT) {
+    Toast.makeText(this, resId, duration).show()
 }

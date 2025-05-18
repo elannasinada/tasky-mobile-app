@@ -3,6 +3,7 @@ package io.tasky.taskyapp.task.presentation.listing
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.rememberModalBottomSheetState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -76,6 +78,7 @@ fun TasksScreen(
     onRequestDelete: (Task) -> Unit,
     onRestoreTask: () -> Unit,
     onSearchTask: (String) -> Unit,
+    onTestNotification: () -> Unit = {}
 ) {
     val selectedTaskType = remember {
         mutableStateOf("")
@@ -134,6 +137,7 @@ fun TasksScreen(
             onRequestDelete = onRequestDelete,
             onRestoreTask = onRestoreTask,
             onSearchTask = onSearchTask,
+            onTestNotification = onTestNotification,
             onSignOut = onSignOut,
         )
     }
@@ -152,6 +156,7 @@ private fun TasksScaffold(
     onRequestDelete: (Task) -> Unit,
     onRestoreTask: () -> Unit,
     onSearchTask: (String) -> Unit,
+    onTestNotification: () -> Unit = {},
     onSignOut: () -> Unit,
 ) {
     val context = LocalContext.current

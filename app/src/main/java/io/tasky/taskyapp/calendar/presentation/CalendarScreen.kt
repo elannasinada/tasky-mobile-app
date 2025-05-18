@@ -85,15 +85,16 @@ fun CalendarScreen(
     tasks: List<Task> = emptyList()
 ) {
     val state = viewModel.state
-    
+
     // Remember the currently visible month (default to current month)
     var currentMonth by remember { mutableStateOf(YearMonth.now()) }
-    
+
     // Load events when tasks change
     LaunchedEffect(tasks) {
         viewModel.loadCalendarEvents(tasks)
     }
-    
+
+    // Handle events from the viewModel
     LaunchedEffect(key1 = true) {
         viewModel.eventFlow.collectLatest { event ->
             when (event) {
@@ -107,6 +108,13 @@ fun CalendarScreen(
                     onRequestGoogleSignIn(event.options)
                 }
             }
+        }
+    }
+
+    // Auto-refresh calendar data when screen is accessed
+    LaunchedEffect(key1 = true) {
+        if (!state.isLoading && !state.showGoogleSignInPrompt) {
+            viewModel.refreshCalendarAndTasks(tasks, showToasts = false)
         }
     }
 
@@ -127,9 +135,8 @@ fun CalendarScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { 
-                    viewModel.showToast("Syncing calendar and tasks...")
-                    // Combined refresh - syncs calendar events and tasks in one operation
+                onClick = {
+                    viewModel.showToast("Refreshing calendar...")
                     viewModel.refreshCalendarAndTasks(tasks)
                 },
                 containerColor = MaterialTheme.colorScheme.primaryContainer
@@ -254,13 +261,12 @@ fun CalendarScreen(
                                     text = "No events for this date",
                                     style = MaterialTheme.typography.bodyMedium
                                 )
-                                
+
                                 Spacer(modifier = Modifier.height(8.dp))
-                                
+
                                 Button(
-                                    onClick = { 
-                                        viewModel.showToast("Syncing calendar and tasks...")
-                                        // Combined refresh - syncs calendar events and tasks in one operation
+                                    onClick = {
+                                        viewModel.showToast("Refreshing calendar...")
                                         viewModel.refreshCalendarAndTasks(tasks)
                                     }
                                 ) {

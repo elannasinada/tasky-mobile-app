@@ -73,7 +73,7 @@ fun SignInBottomSheetContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 72.dp, vertical = 16.dp),
-                text = stringResource(id = R.string.sign_in),
+                text = stringResource(id = R.string.sign_up),
                 onClick = {
                     onSignInWithEmailAndPassword(
                         email.value,

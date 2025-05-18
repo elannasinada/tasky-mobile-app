@@ -15,6 +15,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.tasky.taskyapp.calendar.data.CalendarRealtimeDatabaseClient
 import io.tasky.taskyapp.calendar.data.CalendarRealtimeDatabaseClientImpl
+import io.tasky.taskyapp.core.service.NotificationScheduler
 import io.tasky.taskyapp.core.util.TaskyToaster
 import io.tasky.taskyapp.core.util.TASK
 import io.tasky.taskyapp.core.util.Toaster
@@ -80,5 +81,11 @@ object AppModule {
     @Singleton
     fun providesToaster(@ApplicationContext app: Context): Toaster {
         return TaskyToaster(app)
+    }
+
+    @Provides
+    @Singleton
+    fun providesNotificationScheduler(@ApplicationContext context: Context): NotificationScheduler {
+        return NotificationScheduler(context)
     }
 }

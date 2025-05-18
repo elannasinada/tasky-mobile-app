@@ -1,8 +1,13 @@
 package io.tasky.taskyapp.task.presentation.listing
 
+import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import io.tasky.taskyapp.core.service.NotificationScheduler
+import io.tasky.taskyapp.core.service.TaskyNotificationService
 import io.tasky.taskyapp.core.util.Resource
 import io.tasky.taskyapp.core.util.filterBy
 import io.tasky.taskyapp.sign_in.domain.model.UserData
@@ -12,6 +17,7 @@ import io.tasky.taskyapp.task.domain.model.RecurrencePattern
 import io.tasky.taskyapp.task.domain.use_cases.TaskUseCases
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.launchIn
@@ -27,7 +33,9 @@ import javax.inject.Inject
 
 @HiltViewModel
 class TaskViewModel @Inject constructor(
-    private val useCases: TaskUseCases
+    private val useCases: TaskUseCases,
+    @ApplicationContext private val context: Context,
+    private val notificationScheduler: NotificationScheduler
 ) : ViewModel() {
     private val _state = MutableStateFlow(TaskState())
     val state: StateFlow<TaskState> = _state
@@ -38,6 +46,18 @@ class TaskViewModel @Inject constructor(
 
     private var recentlyDeletedTask: Task? = null
     var userData: UserData? = null
+
+    private val TAG = "TaskViewModel"
+
+    fun getRecentlyDeletedTask(): Task? {
+        return recentlyDeletedTask
+    }
+
+    fun clearState() {
+        _state.value = TaskState()
+        tasks.clear()
+        recentlyDeletedTask = null
+    }
 
     fun onEvent(event: TaskEvent) {
         when (event) {
@@ -56,22 +76,28 @@ class TaskViewModel @Inject constructor(
                     }
                 }
             }
+
             is TaskEvent.RequestDelete -> {
                 with(event.task) {
                     deleteTask(this)
                     recentlyDeletedTask = this
                 }
             }
+
             is TaskEvent.RestoreTask -> {
-                recentlyDeletedTask?.let {
-                    restoreTask(it)
-                }
+                restoreTask(event.task)
             }
+
             is TaskEvent.CompleteTask -> {
                 completeTask(event.task)
             }
+
             is TaskEvent.UpdateTaskStatus -> {
                 updateTaskStatus(event.task, event.newStatus)
+            }
+
+            is TaskEvent.EnsureNotifications -> {
+                ensureNotificationsForTasks()
             }
         }
     }
@@ -83,19 +109,25 @@ class TaskViewModel @Inject constructor(
                 is Resource.Success -> {
                     tasks.clear()
 
-                    result.data?.let { tasks ->
-                        this.tasks.addAll(tasks)
-
-                        // Analyze tasks with the TensorFlow model to determine priorities
-                        predictTaskPriorities(tasks) { prioritizedTasks ->
-                            _state.update {
-                                it.copy(
-                                    tasks = prioritizedTasks,
-                                )
-                            }
+                    result.data?.let { fetchedTasks ->
+                        this.tasks.clear()
+                        this.tasks.addAll(fetchedTasks)
+                        _state.update {
+                            it.copy(
+                                tasks = fetchedTasks,
+                            )
                         }
+                        checkForApproachingDeadlines()
+
+                        // Schedule notifications for tasks whenever we load or refresh them
+                        notificationScheduler.rescheduleAllTasks(tasks)
+                        Log.d(
+                            TAG,
+                            "Rescheduled notifications for ${tasks.size} tasks after loading"
+                        )
                     }
                 }
+
                 is Resource.Loading -> {
                     _state.update {
                         it.copy(
@@ -103,6 +135,7 @@ class TaskViewModel @Inject constructor(
                         )
                     }
                 }
+
                 is Resource.Error -> {
                     _state.update {
                         it.copy(
@@ -128,6 +161,21 @@ class TaskViewModel @Inject constructor(
                         status = TaskStatus.valueOf(status)
                     )
                     getTasks(it)
+
+                    if (task.status == TaskStatus.PENDING.name &&
+                        !task.deadlineDate.isNullOrEmpty() &&
+                        !task.deadlineTime.isNullOrEmpty()
+                    ) {
+                        TaskyNotificationService.sendGeneralNotification(
+                            context,
+                            "Task Restored",
+                            "The task \"${task.title}\" has been restored"
+                        )
+
+                        // Schedule notification for the restored task
+                        notificationScheduler.scheduleTaskReminder(task)
+                        Log.d(TAG, "Scheduled notification for restored task: ${task.title}")
+                    }
                 }
             }
         }
@@ -136,6 +184,10 @@ class TaskViewModel @Inject constructor(
     private fun deleteTask(task: Task) {
         viewModelScope.launch {
             userData?.let {
+                // Cancel any scheduled notifications first
+                notificationScheduler.cancelTaskReminder(task)
+                Log.d(TAG, "Cancelled notifications for deleted task: ${task.title}")
+
                 useCases.deleteTaskUseCase(it, task)
                 getTasks(it)
             }
@@ -159,9 +211,35 @@ class TaskViewModel @Inject constructor(
                     status = newStatus.name
                 )
 
-                // If task is completed and it's recurring, create next occurrence
-                if (newStatus == TaskStatus.COMPLETED && task.isRecurring) {
-                    createNextOccurrence(task, userData)
+                // If completing a task, show notification and handle recurrence
+                if (newStatus == TaskStatus.COMPLETED) {
+                    // Cancel the reminder for the completed task
+                    notificationScheduler.cancelTaskReminder(task)
+                    Log.d(TAG, "Cancelled notifications for completed task: ${task.title}")
+
+                    TaskyNotificationService.sendGeneralNotification(
+                        context,
+                        "Task Completed",
+                        "You've completed \"${task.title}\""
+                    )
+
+                    if (task.isRecurring) {
+                        createNextOccurrence(task, userData)
+                    }
+                } else if (newStatus == TaskStatus.PENDING) {
+                    // If status changed to PENDING, reschedule notification
+                    notificationScheduler.scheduleTaskReminder(task)
+                    Log.d(
+                        TAG,
+                        "Rescheduled notification for task changed to pending: ${task.title}"
+                    )
+                } else {
+                    // For other statuses, cancel reminders
+                    notificationScheduler.cancelTaskReminder(task)
+                    Log.d(
+                        TAG,
+                        "Cancelled notifications for task with status ${newStatus.name}: ${task.title}"
+                    )
                 }
 
                 getTasks(userData)
@@ -210,10 +288,29 @@ class TaskViewModel @Inject constructor(
                 recurrenceInterval = nextTask.recurrenceInterval,
                 recurrenceEndDate = nextTask.recurrenceEndDate
             )
+
+            if (nextTask.deadlineDate != null) {
+                TaskyNotificationService.sendGeneralNotification(
+                    context,
+                    "Recurring Task Created",
+                    "Next occurrence of \"${nextTask.title}\" has been scheduled"
+                )
+
+                // Schedule notification for the new recurring task
+                notificationScheduler.scheduleTaskReminder(nextTask)
+                Log.d(
+                    TAG,
+                    "Scheduled notification for new recurring task: ${nextTask.title}"
+                )
+            }
         }
     }
 
-    private fun calculateNextDeadline(currentDeadline: String?, pattern: String?, interval: Int): String? {
+    private fun calculateNextDeadline(
+        currentDeadline: String?,
+        pattern: String?,
+        interval: Int
+    ): String? {
         if (currentDeadline == null || pattern == null) return null
 
         try {
@@ -224,7 +321,11 @@ class TaskViewModel @Inject constructor(
 
             when (pattern) {
                 RecurrencePattern.DAILY.name -> calendar.add(Calendar.DAY_OF_YEAR, interval)
-                RecurrencePattern.WEEKLY.name -> calendar.add(Calendar.WEEK_OF_YEAR, interval)
+                RecurrencePattern.WEEKLY.name -> calendar.add(
+                    Calendar.WEEK_OF_YEAR,
+                    interval
+                )
+
                 RecurrencePattern.MONTHLY.name -> calendar.add(Calendar.MONTH, interval)
                 RecurrencePattern.YEARLY.name -> calendar.add(Calendar.YEAR, interval)
             }
@@ -246,28 +347,141 @@ class TaskViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Analyzes tasks using the TensorFlow model to predict priority levels.
-     * 
-     * @param tasks The tasks to analyze
-     * @param callback Function that receives the tasks with updated priorities
-     */
-    private fun predictTaskPriorities(tasks: List<Task>, callback: (List<Task>) -> Unit) {
-        if (tasks.isEmpty()) {
-            callback(emptyList())
-            return
+    fun checkForApproachingDeadlines() {
+        val today = Calendar.getInstance()
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        var tasksChecked = 0
+        var approachingTasks = 0
+
+        tasks.filter {
+            it.status == TaskStatus.PENDING.name && !it.deadlineDate.isNullOrEmpty()
+        }.forEach { task ->
+            tasksChecked++
+            try {
+                dateFormat.parse(task.deadlineDate!!)?.let { deadlineDate ->
+                    Calendar.getInstance().apply { time = deadlineDate }
+                        .let { deadlineCalendar ->
+                            val daysDifference =
+                                (deadlineCalendar.timeInMillis - today.timeInMillis) / (24 * 60 * 60 * 1000)
+                            if (daysDifference in 0..1) {
+                                approachingTasks++
+                                TaskyNotificationService.sendTaskDueNotification(
+                                    context,
+                                    task
+                                )
+                                Log.d(
+                                    TAG,
+                                    "Found approaching deadline for task: ${task.title}, days remaining: $daysDifference"
+                                )
+                            }
+                        }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error checking deadline for task: ${task.title}", e)
+            }
         }
-        
-        val updatedTasks = tasks.map { task ->
-            val priority = useCases.predictTaskPriorityUseCase(task)
-            task.withPriority(priority)
-        }
-        
-        // Sort tasks by priority (high to low)
-        callback(updatedTasks.sortedByDescending { it.priority })
+
+        Log.d(
+            TAG,
+            "Checked $tasksChecked tasks, found $approachingTasks with approaching deadlines"
+        )
     }
 
-    fun clearState() {
-        _state.update { TaskState() }
+    fun onTaskCreated(task: Task) {
+        if (task.status == TaskStatus.PENDING.name && !task.deadlineDate.isNullOrEmpty()) {
+            // Schedule notification
+            notificationScheduler.scheduleTaskReminder(task)
+            Log.d(TAG, "Scheduled notification for new task: ${task.title}")
+
+            TaskyNotificationService.sendGeneralNotification(
+                context,
+                "New Task Created",
+                "You've created a new task: \"${task.title}\""
+            )
+
+            try {
+                val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                dateFormat.parse(task.deadlineDate!!)?.let { deadlineDate ->
+                    val today = Calendar.getInstance()
+                    val deadlineCalendar =
+                        Calendar.getInstance().apply { time = deadlineDate }
+                    val daysDifference =
+                        (deadlineCalendar.timeInMillis - today.timeInMillis) / (24 * 60 * 60 * 1000)
+
+                    if (daysDifference in 0..2) {
+                        viewModelScope.launch {
+                            delay(3000)
+                            TaskyNotificationService.sendTaskDueNotification(context, task)
+                            Log.d(
+                                TAG,
+                                "Sent immediate task due notification for approaching task: ${task.title}"
+                            )
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error checking new task deadline", e)
+            }
+        }
+    }
+
+    // Add this new method to ensure notifications are working
+    fun ensureNotificationsForTasks() {
+        viewModelScope.launch {
+            Log.d(TAG, "Ensuring notifications for all tasks")
+
+            // First, verify notification channels are set up
+            TaskyNotificationService.createNotificationChannels(context)
+
+            // Send a test notification
+            TaskyNotificationService.sendTestNotification(context)
+
+            // Create an immediate test task with notification
+            val cal = Calendar.getInstance()
+            cal.add(Calendar.MINUTE, 1)
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+
+            val testTask = Task(
+                uuid = "test-${System.currentTimeMillis()}",
+                title = "Test Task - Due Soon!",
+                description = "This task is due in 1 minute to test notifications",
+                taskType = "TEST",
+                deadlineDate = dateFormat.format(cal.time),
+                deadlineTime = timeFormat.format(cal.time),
+                status = TaskStatus.PENDING.name
+            )
+
+            // Schedule immediate notification for this task
+            notificationScheduler.scheduleTaskReminder(testTask)
+
+            // Send immediate due notification for the task
+            TaskyNotificationService.sendTaskDueNotification(context, testTask)
+
+            Log.d(TAG, "Created test task with immediate notification: ${testTask.title}")
+            Log.d(TAG, "Deadline set for: ${testTask.deadlineDate} ${testTask.deadlineTime}")
+
+            // Reschedule all pending tasks
+            val pendingTasks = tasks.filter {
+                it.status == TaskStatus.PENDING.name &&
+                        !it.deadlineDate.isNullOrEmpty() &&
+                        !it.deadlineTime.isNullOrEmpty()
+            }
+
+            Log.d(TAG, "Rescheduling notifications for ${pendingTasks.size} pending tasks")
+
+            // Reschedule all tasks
+            notificationScheduler.rescheduleAllTasks(pendingTasks)
+
+            // Also send a notification to verify the system is working
+            userData?.let {
+                val userLabel = it.userName ?: it.email ?: "User"
+                TaskyNotificationService.sendGeneralNotification(
+                    context,
+                    "Notification System Check",
+                    "Hello $userLabel! Task notifications have been verified and are working correctly."
+                )
+            }
+        }
     }
 }

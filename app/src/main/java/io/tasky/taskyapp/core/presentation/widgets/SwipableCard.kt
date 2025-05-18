@@ -27,6 +27,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import io.tasky.taskyapp.core.util.toDp
 import io.tasky.taskyapp.ui.theme.CardBackgroundDark
 import io.tasky.taskyapp.ui.theme.CardBackgroundLight
@@ -41,6 +42,7 @@ fun SwipeableCard(
     swipedContent: @Composable (() -> Unit),
     onClickCard: () -> Unit,
     cardContent: @Composable (ColumnScope.() -> Unit),
+    modifier: Modifier = Modifier
 ) {
     val isSwiped = remember {
         mutableStateOf(false)
@@ -72,7 +74,7 @@ fun SwipeableCard(
 
     val scope = rememberCoroutineScope()
 
-    Surface {
+    Surface(color = Color.Transparent) {
         if (offsetTransition.value > 0) {
             Surface(
                 modifier = Modifier
@@ -93,7 +95,7 @@ fun SwipeableCard(
         }
 
         DefaultCard(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)
                 .padding(bottom = 12.dp)

@@ -1,7 +1,6 @@
 package io.tasky.taskyapp.sign_in.di
 
 import dagger.Module
-import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.components.ViewModelComponent
 import io.tasky.taskyapp.sign_in.data.auth_client.GoogleAuthClient
@@ -18,20 +17,5 @@ import io.tasky.taskyapp.sign_in.domain.use_cases.SignInWithGoogleUseCase
 @Module
 @InstallIn(ViewModelComponent::class)
 object SignInModule {
-    @Provides
-    fun providesSignInRepository(googleAuthUiClient: GoogleAuthClient): SignInRepository {
-        return SignInRepositoryImpl(googleAuthUiClient)
-    }
-
-    @Provides
-    fun providesSignInUseCases(repository: SignInRepository): SignInUseCases {
-        return SignInUseCases(
-            loginWithEmailAndPasswordUseCase = LoginWithEmailAndPasswordUseCase(repository),
-            signInWithEmailAndPasswordUseCase = SignInWithEmailAndPasswordUseCase(repository),
-            signInWithGoogleUseCase = SignInWithGoogleUseCase(repository),
-            signInUseCase = SignInUseCase(repository),
-            getSignedInUserUseCase = GetSignedInUserUseCase(repository),
-            logoutUseCase = LogoutUseCase(repository)
-        )
-    }
+    // All providers removed to avoid duplicate bindings with SignInSingletonModule
 }

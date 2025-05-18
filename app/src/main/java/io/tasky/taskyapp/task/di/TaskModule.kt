@@ -3,7 +3,6 @@ package io.tasky.taskyapp.task.di
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.Module
-import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.components.ViewModelComponent
 import io.tasky.taskyapp.task.data.remote.RealtimeDatabaseClient
@@ -19,28 +18,4 @@ import io.tasky.taskyapp.task.domain.use_cases.UpdateTaskUseCase
 @Module
 @InstallIn(ViewModelComponent::class)
 object TaskModule {
-    @Provides
-    fun providesTaskRepository(
-        realtimeDatabaseClient: RealtimeDatabaseClient,
-    ): TaskRepository {
-        return TaskRepositoryImpl(realtimeDatabaseClient)
-    }
-
-    @Provides
-    fun providesTaskUseCases(
-        repository: TaskRepository,
-        @ApplicationContext context: Context
-    ) = TaskUseCases(
-        deleteTaskUseCase = DeleteTaskUseCase(repository),
-        getTasksUseCase = GetTasksUseCase(repository),
-        insertTaskUseCase = InsertTaskUseCase(
-            repository = repository, 
-            predictTaskPriorityUseCase = PredictTaskPriorityUseCase(context)
-        ),
-        updateTaskUseCase = UpdateTaskUseCase(
-            repository = repository,
-            predictTaskPriorityUseCase = PredictTaskPriorityUseCase(context)
-        ),
-        predictTaskPriorityUseCase = PredictTaskPriorityUseCase(context)
-    )
 }

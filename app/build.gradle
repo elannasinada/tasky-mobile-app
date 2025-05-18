@@ -130,6 +130,10 @@ dependencies {
     kapt "com.google.dagger:hilt-android-compiler:$hilt_version"
     kapt "androidx.hilt:hilt-compiler:1.1.0"
 
+    // WorkManager and Hilt integration
+    implementation "androidx.work:work-runtime-ktx:2.8.1"
+    implementation "androidx.hilt:hilt-work:1.0.0"
+
     implementation "androidx.tracing:tracing:1.1.0"
     implementation 'org.apache.logging.log4j:log4j-slf4j2-impl:2.20.0'
 

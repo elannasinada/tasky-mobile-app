@@ -53,12 +53,12 @@ fun TaskCard(
     modifier: Modifier = Modifier
 ) {
     SwipeableCard(
+        modifier = modifier,
         onClickSwiped = onClickDelete,
         swipedContent = {
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(end = 16.dp),
+                    .fillMaxSize(),
                 contentAlignment = Alignment.CenterStart
             ) {
                 Box(
@@ -81,7 +81,6 @@ fun TaskCard(
     )
 }
 
-@ExperimentalMaterial3Api
 @Composable
 private fun TaskCardContent(task: Task) {
     val showDescription = remember {
@@ -112,171 +111,115 @@ private fun TaskCardContent(task: Task) {
         else -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f)
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(0.dp)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = cardBackgroundColor
+        )
     ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = cardBackgroundColor
-            )
-        ) {
-            Column {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Start
+        Column {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Start
+            ) {
+                DefaultIcon(
+                    modifier = Modifier.size(48.dp),
+                    iconModifier = Modifier.fillMaxSize(0.7F),
+                    shape = RoundedCornerShape(16.dp),
+                    containerColor = MaterialTheme.colorScheme.background.copy(0.9F),
+                    painter = painterResource(
+                        id = TaskType.valueOf(task.taskType).painterId
+                    ),
+                    contentDescription = TaskType.valueOf(task.taskType).name,
+                )
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(0.85F)
                 ) {
-                    DefaultIcon(
-                        modifier = Modifier.size(48.dp),
-                        iconModifier = Modifier.fillMaxSize(0.7F),
-                        shape = RoundedCornerShape(16.dp),
-                        containerColor = MaterialTheme.colorScheme.background.copy(0.9F),
-                        painter = painterResource(
-                            id = TaskType.valueOf(task.taskType).painterId
-                        ),
-                        contentDescription = TaskType.valueOf(task.taskType).name,
+                    Text(
+                        text = task.title,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 18.sp,
+                        textDecoration = if (isCompleted || isCancelled) TextDecoration.LineThrough else TextDecoration.None,
+                        color = textColor
+                    )
+                    Text(
+                        text = "${task.deadlineDate?.replace("-", "/")}" +
+                                " ${task.deadlineTime}",
+                        fontSize = 12.sp,
+                        color = textColor
                     )
 
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                    Column(
-                        modifier = Modifier.fillMaxWidth(0.85F)
+                    // Status chip
+                    Card(
+                        shape = RoundedCornerShape(50),
+                        colors = CardDefaults.cardColors(
+                            containerColor = statusChipColor
+                        )
                     ) {
                         Text(
-                            text = task.title,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 18.sp,
-                            textDecoration = if (isCompleted || isCancelled) TextDecoration.LineThrough else TextDecoration.None,
-                            color = textColor
+                            text = task.status,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                            fontSize = 10.sp,
+                            color = Color.White
                         )
-                        Text(
-                            text = "${task.deadlineDate?.replace("-", "/")}" +
-                                    " ${task.deadlineTime}",
-                            fontSize = 12.sp,
-                            color = textColor
-                        )
+                    }
 
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        // Status chip
-                        Card(
-                            shape = RoundedCornerShape(50),
-                            colors = CardDefaults.cardColors(
-                                containerColor = statusChipColor
-                            )
-                        ) {
-                            Text(
-                                text = task.status,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                fontSize = 10.sp,
-                                color = Color.White
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        // Priority indicator
+                    if (task.isRecurring) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            when (task.priority) {
-                                2 -> {
-                                    Card(
-                                        modifier = Modifier.size(8.dp),
-                                        shape = RoundedCornerShape(4.dp),
-                                        colors = CardDefaults.cardColors(containerColor = Color.Red)
-                                    ) {}
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "High priority",
-                                        fontSize = 10.sp,
-                                        color = Color.Red
-                                    )
-                                }
-                                1 -> {
-                                    Card(
-                                        modifier = Modifier.size(8.dp),
-                                        shape = RoundedCornerShape(4.dp),
-                                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFA500)) // Orange
-                                    ) {}
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "Medium priority",
-                                        fontSize = 10.sp,
-                                        color = Color(0xFFFFA500) // Orange
-                                    )
-                                }
-                                else -> {
-                                    Card(
-                                        modifier = Modifier.size(8.dp),
-                                        shape = RoundedCornerShape(4.dp),
-                                        colors = CardDefaults.cardColors(containerColor = Color.Green)
-                                    ) {}
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "Low priority",
-                                        fontSize = 10.sp,
-                                        color = Color.Green
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        if (task.isRecurring) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = "Recurring",
-                                    modifier = Modifier.size(12.dp),
-                                    tint = if (isCompleted) Color(0xFF006400) else MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "Recurring: ${getRecurrenceText(task)}",
-                                    fontSize = 10.sp,
-                                    color = textColor
-                                )
-                            }
-                        }
-                    }
-
-                    task.description?.takeIf {
-                        it.isNotBlank()
-                    }?.let {
-                        IconButton(
-                            onClick = {
-                                showDescription.value = showDescription.value.not()
-                            }
-                        ) {
                             Icon(
-                                imageVector = if (showDescription.value)
-                                    Icons.Default.KeyboardArrowDown
-                                else Icons.Default.KeyboardArrowRight,
-                                contentDescription = "showDescription",
-                                tint = textColor
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Recurring",
+                                modifier = Modifier.size(12.dp),
+                                tint = if (isCompleted) Color(0xFF006400) else MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Recurring: ${getRecurrenceText(task)}",
+                                fontSize = 10.sp,
+                                color = textColor
                             )
                         }
                     }
                 }
 
-                AnimatedVisibility(visible = showDescription.value) {
-                    Text(
-                        text = task.description ?: "",
-                        modifier = Modifier
-                            .padding(horizontal = 24.dp)
-                            .padding(bottom = 12.dp),
-                        fontSize = 16.sp,
-                        textDecoration = TextDecoration.None,
-                        color = textColor
-                    )
+                task.description?.takeIf {
+                    it.isNotBlank()
+                }?.let {
+                    IconButton(
+                        onClick = {
+                            showDescription.value = showDescription.value.not()
+                        }
+                    ) {
+                        Icon(
+                            imageVector = if (showDescription.value)
+                                Icons.Default.KeyboardArrowDown
+                            else Icons.Default.KeyboardArrowRight,
+                            contentDescription = "showDescription",
+                            tint = textColor
+                        )
+                    }
                 }
+            }
+
+            AnimatedVisibility(visible = showDescription.value) {
+                Text(
+                    text = task.description ?: "",
+                    modifier = Modifier
+                        .padding(horizontal = 24.dp)
+                        .padding(bottom = 12.dp),
+                    fontSize = 16.sp,
+                    textDecoration = TextDecoration.None,
+                    color = textColor
+                )
             }
         }
     }

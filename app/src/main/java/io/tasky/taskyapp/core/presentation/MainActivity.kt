@@ -1,6 +1,10 @@
 package io.tasky.taskyapp.core.presentation
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -25,6 +29,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -34,12 +40,14 @@ import io.tasky.taskyapp.R
 import io.tasky.taskyapp.calendar.presentation.CalendarScreen
 import io.tasky.taskyapp.calendar.presentation.CalendarViewModel
 import io.tasky.taskyapp.core.presentation.navigation.MainScreens
+import io.tasky.taskyapp.core.service.TaskyNotificationService
 import io.tasky.taskyapp.core.util.TASK
 import io.tasky.taskyapp.core.util.Toaster
 import io.tasky.taskyapp.sign_in.presentation.SignInScreen
 import io.tasky.taskyapp.sign_in.presentation.sing_in.SignInEvent
 import io.tasky.taskyapp.sign_in.presentation.sing_in.SignInViewModel
 import io.tasky.taskyapp.task.domain.model.Task
+import io.tasky.taskyapp.task.domain.model.TaskStatus
 import io.tasky.taskyapp.task.presentation.details.TaskDetailsEvent
 import io.tasky.taskyapp.task.presentation.details.TaskDetailsScreen
 import io.tasky.taskyapp.task.presentation.details.TaskDetailsViewModel
@@ -53,6 +61,9 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 /**
  * Activity on which every screen of the app is displayed.
@@ -64,10 +75,62 @@ import java.nio.charset.StandardCharsets
 class MainActivity : ComponentActivity() {
     @Inject
     lateinit var toaster: Toaster
+    
+    private val TAG = "MainActivity"
+    
+    companion object {
+        private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 123
+    }
+    
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            Log.d(TAG, "Notification permission granted, setting up notifications")
+            setupNotifications()
+        } else {
+            Log.d(TAG, "Notification permission denied")
+            toaster.showToast("Notifications disabled. You won't receive task reminders.")
+        }
+    }
+    
+    private fun checkAndRequestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            when {
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED -> {
+                    Log.d(TAG, "Notification permission already granted")
+                    setupNotifications()
+                }
+                shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) -> {
+                    Log.d(TAG, "Should show permission rationale")
+                    requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+                else -> {
+                    Log.d(TAG, "Requesting notification permission")
+                    requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
+        } else {
+            Log.d(TAG, "Android version < 13, notification permission not needed")
+            setupNotifications()
+        }
+    }
+    
+    private fun setupNotifications() {
+        Log.d(TAG, "Setting up notifications")
+        TaskyNotificationService.createNotificationChannels(this)
+        TaskyNotificationService.sendTestNotification(this)
+    }
 
     @ExperimentalMaterialApi
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Setup notifications before UI
+        checkAndRequestNotificationPermission()
 
         setContent {
             TaskyTheme {
@@ -215,10 +278,41 @@ class MainActivity : ComponentActivity() {
                                     taskViewModel.onEvent(TaskEvent.RequestDelete(task))
                                 },
                                 onRestoreTask = {
-                                    taskViewModel.onEvent(TaskEvent.RestoreTask)
+                                    taskViewModel.getRecentlyDeletedTask()?.let { task ->
+                                        taskViewModel.onEvent(TaskEvent.RestoreTask(task))
+                                    }
                                 },
                                 onSearchTask = { filter ->
                                     taskViewModel.onEvent(TaskEvent.SearchedForTask(filter))
+                                },
+                                onTestNotification = {
+                                    // Direct test of notifications - this should immediately show a notification
+                                    Log.d(TAG, "Test notification button clicked")
+                                    TaskyNotificationService.sendTestNotification(this@MainActivity)
+                                    
+                                    // Also try to trigger task notifications check
+                                    taskViewModel.onEvent(TaskEvent.EnsureNotifications)
+                                    
+                                    // Create a test task with a deadline in 1 minute
+                                    val cal = Calendar.getInstance()
+                                    cal.add(Calendar.MINUTE, 1)
+                                    val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                                    val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+                                    
+                                    val testTask = Task(
+                                        uuid = "test-${System.currentTimeMillis()}",
+                                        title = "Test Notification Task",
+                                        description = "This task tests the notification system",
+                                        taskType = "TEST",
+                                        deadlineDate = dateFormat.format(cal.time),
+                                        deadlineTime = timeFormat.format(cal.time),
+                                        status = TaskStatus.PENDING.name
+                                    )
+                                    
+                                    // Schedule a notification for this test task
+                                    taskViewModel.onTaskCreated(testTask)
+                                    
+                                    toaster.showToast("Test notification sent - check your notifications")
                                 }
                             )
                         }
