@@ -11,7 +11,9 @@ import io.tasky.taskyapp.task.domain.model.Task
 import io.tasky.taskyapp.task.domain.model.TaskStatus
 import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
+import java.text.ParseException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -44,15 +46,47 @@ class NotificationScheduler @Inject constructor(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (!alarmManager.canScheduleExactAlarms()) {
                 Log.e(TAG, "Cannot schedule exact alarms - permission not granted")
+                // Send immediate notification about missing permission
+                TaskyNotificationService.sendGeneralNotification(
+                    context,
+                    "Permission Required",
+                    "Please grant exact alarm permission for task reminders to work properly"
+                )
                 return
             }
         }
 
         try {
-            val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            // Try both date formats
+            val dateFormats = listOf(
+                SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()),
+                SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+            )
+            
             val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+            
+            // Try parsing the date with different formats
+            var date: Date? = null
+            var usedFormat: SimpleDateFormat? = null
+            
+            for (format in dateFormats) {
+                try {
+                    date = format.parse(task.deadlineDate!!)
+                    if (date != null) {
+                        usedFormat = format
+                        Log.d(TAG, "Successfully parsed date using format: ${format.toPattern()}")
+                        break
+                    }
+                } catch (e: ParseException) {
+                    Log.d(TAG, "Failed to parse date with format ${format.toPattern()}: ${e.message}")
+                }
+            }
+            
+            if (date == null) {
+                Log.e(TAG, "Failed to parse date: ${task.deadlineDate}")
+                return
+            }
 
-            val date = dateFormat.parse(task.deadlineDate!!) ?: return
             val time = timeFormat.parse(task.deadlineTime!!) ?: return
 
             val calendar = Calendar.getInstance()
@@ -67,38 +101,67 @@ class NotificationScheduler @Inject constructor(
 
             val now = Calendar.getInstance()
 
-            // 1. Schedule 15-minute before deadline reminder
-            val reminderCalendar = calendar.clone() as Calendar
-            reminderCalendar.add(Calendar.MINUTE, -15)
-            
-            if (reminderCalendar.after(now)) {
-                scheduleNotificationAtTime(
+            // Calculate minutes remaining until deadline
+            val minutesRemaining = (calendar.timeInMillis - now.timeInMillis) / (60 * 1000)
+
+            // If deadline is in the past, don't schedule
+            if (minutesRemaining <= 0) {
+                Log.d(TAG, "Deadline is in the past, not scheduling notification")
+                return
+            }
+
+            // If deadline is within 15 minutes, send immediate notification
+            if (minutesRemaining <= 15) {
+                Log.d(TAG, "Deadline is within 15 minutes, sending immediate notification. Minutes remaining: $minutesRemaining")
+                
+                // Send immediate notification
+                TaskyNotificationService.sendTaskDueNotification(
+                    context,
                     task,
-                    reminderCalendar.timeInMillis,
-                    true, // isReminderNotification
-                    "reminder-${task.uuid}"
+                    "Task Due Soon: ${task.title}",
+                    "Only $minutesRemaining minutes remaining to complete this task"
                 )
-                Log.d(TAG, "15-minute reminder scheduled for ${reminderCalendar.time}")
             } else {
-                Log.d(TAG, "15-minute reminder time is in the past, not scheduling")
+                // Schedule 15-minute reminder
+                val reminderCalendar = calendar.clone() as Calendar
+                reminderCalendar.add(Calendar.MINUTE, -15)
+                
+                if (reminderCalendar.after(now)) {
+                    scheduleNotificationAtTime(
+                        task,
+                        reminderCalendar.timeInMillis,
+                        true, // isReminderNotification
+                        "reminder-${task.uuid}"
+                    )
+                    Log.d(TAG, "15-minute reminder scheduled for ${reminderCalendar.time}")
+                }
             }
             
-            // 2. Schedule exact deadline notification
-            if (calendar.after(now)) {
-                scheduleNotificationAtTime(
-                    task,
-                    calendar.timeInMillis,
-                    false, // not a reminder, but the actual deadline
-                    "deadline-${task.uuid}"
-                )
-                Log.d(TAG, "Deadline notification scheduled for ${calendar.time}")
-            } else {
-                Log.d(TAG, "Deadline time is in the past, not scheduling notification")
-            }
+            // Schedule exact deadline notification
+            scheduleNotificationAtTime(
+                task,
+                calendar.timeInMillis,
+                false, // not a reminder, but the actual deadline
+                "deadline-${task.uuid}"
+            )
+            Log.d(TAG, "Deadline notification scheduled for ${calendar.time}")
+
+            // Send confirmation notification
+            //TaskyNotificationService.sendGeneralNotification(
+            //    context,
+            //    "Reminder Set",
+            //    "Notifications have been scheduled for task: ${task.title}"
+            //)
 
             Log.d(TAG, "Successfully scheduled notifications for task: ${task.title}")
         } catch (e: Exception) {
             Log.e(TAG, "Error scheduling notifications", e)
+            // Send error notification
+            TaskyNotificationService.sendGeneralNotification(
+                context,
+                "Error Setting Reminder",
+                "Failed to schedule notifications for task: ${task.title}"
+            )
         }
     }
 
@@ -118,6 +181,11 @@ class NotificationScheduler @Inject constructor(
             putExtra("taskType", task.taskType)
             putExtra("taskDeadline", "${task.deadlineDate} ${task.deadlineTime}")
             putExtra("isReminderNotification", isReminderNotification)
+            
+            // If this is a reminder notification, it's the standard 15 minutes
+            if (isReminderNotification) {
+                putExtra("minutesRemaining", 15)
+            }
         }
 
         val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -133,18 +201,23 @@ class NotificationScheduler @Inject constructor(
             flags
         )
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            alarmManager.setExactAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP,
-                triggerTimeMillis,
-                pendingIntent
-            )
-        } else {
-            alarmManager.setExact(
-                AlarmManager.RTC_WAKEUP,
-                triggerTimeMillis,
-                pendingIntent
-            )
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerTimeMillis,
+                    pendingIntent
+                )
+            } else {
+                alarmManager.setExact(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerTimeMillis,
+                    pendingIntent
+                )
+            }
+            Log.d(TAG, "Successfully scheduled ${if (isReminderNotification) "reminder" else "deadline"} notification for ${task.title}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error scheduling ${if (isReminderNotification) "reminder" else "deadline"} notification", e)
         }
     }
 

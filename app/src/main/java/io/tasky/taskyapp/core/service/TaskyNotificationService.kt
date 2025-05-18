@@ -1,5 +1,6 @@
 package io.tasky.taskyapp.core.service
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -39,92 +40,98 @@ object TaskyNotificationService {
             ).apply {
                 description = "Notifications for task due dates"
                 enableVibration(true)
-                vibrationPattern = longArrayOf(0, 250, 250, 250)  // Add vibration pattern
-                setShowBadge(true)  // Show badge on app icon
-                enableLights(true)  // Enable notification light
-                lightColor = android.graphics.Color.RED  // Set light color to red
+                vibrationPattern = longArrayOf(0, 250, 250, 250)
+                setShowBadge(true)
+                enableLights(true)
+                lightColor = android.graphics.Color.RED
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                setSound(android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION), android.media.AudioAttributes.Builder()
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                    .build())
             }
 
-            // General notifications channel with high importance
+            // General notifications channel
             val generalChannel = NotificationChannel(
                 CHANNEL_ID,
                 "General Notifications",
-                NotificationManager.IMPORTANCE_HIGH
+                NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "General application notifications"
+                description = "General app notifications"
                 enableVibration(true)
                 setShowBadge(true)
+                setSound(android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION), android.media.AudioAttributes.Builder()
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                    .build())
             }
 
-            // Create the channels
             notificationManager.createNotificationChannels(listOf(dueChannel, generalChannel))
-
-            // Log the created channels
-            val channels = notificationManager.notificationChannels
-            Log.d(TAG, "Created ${channels.size} notification channels")
-            for (channel in channels) {
-                Log.d(TAG, "Channel: ${channel.id}, Importance: ${channel.importance}")
-            }
-        } else {
-            Log.d(TAG, "Android version < O, no channels needed")
+            Log.d(TAG, "Notification channels created successfully")
         }
     }
 
     /**
-     * Send a task due notification with default title and message
-     */
-    fun sendTaskDueNotification(context: Context, task: Task) {
-        sendTaskDueNotification(
-            context,
-            task,
-            "Task Due: ${task.title}",
-            task.description ?: "It's time to complete this task"
-        )
-    }
-
-    /**
-     * Send a task due notification with custom title and message
+     * Send a notification for a task that is due
      */
     fun sendTaskDueNotification(
         context: Context,
         task: Task,
-        title: String,
-        message: String
+        title: String = "Task Due: ${task.title}",
+        message: String = "This task is due soon"
     ) {
-        val notificationManager = NotificationManagerCompat.from(context)
-
-        Log.d(TAG, "Sending task notification: $title")
-
-        // Create an intent to open the app
-        val intent = createMainActivityIntent(context).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            putExtra("taskId", task.uuid)
-        }
-
-        // Create pending intent with compatibility handling
-        val pendingIntent = getPendingIntent(context, task.uuid.hashCode(), intent)
-
-        // Create notification content
-        val builder = NotificationCompat.Builder(context, TASK_DUE_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle(title)
-            .setContentText(message)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setContentIntent(pendingIntent)
-            .setAutoCancel(true)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
-            .setVibrate(longArrayOf(0, 250, 250, 250))  // Add vibration explicitly
-
         try {
-            // Use a unique ID for each notification type
-            val notificationId = (title + task.uuid).hashCode()
-            notificationManager.notify(notificationId, builder.build())
-            Log.d(TAG, "Notification sent successfully with ID: $notificationId")
-        } catch (e: SecurityException) {
-            // Handle the case where notification permission is not granted
-            Log.e(TAG, "Permission denied when sending notification", e)
+            // Ensure notification channels are created
+            createNotificationChannels(context)
+
+            val intent = Intent().apply {
+                setClassName(
+                    context.packageName,
+                    MAIN_ACTIVITY_CLASS_NAME
+                )
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                putExtra("taskId", task.uuid)
+            }
+
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                task.uuid.hashCode(),
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val notification = NotificationCompat.Builder(context, TASK_DUE_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setContentTitle(title)
+                .setContentText(message)
+                .setStyle(NotificationCompat.BigTextStyle()
+                    .bigText(message)
+                    .setBigContentTitle(title))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setVibrate(longArrayOf(0, 250, 250, 250))
+                .setLights(android.graphics.Color.RED, 3000, 3000)
+                .setSound(android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION))
+                .build()
+
+            with(NotificationManagerCompat.from(context)) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    if (context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        notify(task.uuid.hashCode(), notification)
+                        Log.d(TAG, "Task due notification sent for: ${task.title} (Android 13+)")
+                    } else {
+                        Log.e(TAG, "Notification permission not granted for Android 13+")
+                    }
+                } else {
+                    notify(task.uuid.hashCode(), notification)
+                    Log.d(TAG, "Task due notification sent for: ${task.title} (Pre-Android 13)")
+                }
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Error sending notification", e)
+            Log.e(TAG, "Error sending task due notification", e)
         }
     }
 
@@ -132,34 +139,52 @@ object TaskyNotificationService {
      * Send a general notification
      */
     fun sendGeneralNotification(context: Context, title: String, message: String) {
-        val notificationManager = NotificationManagerCompat.from(context)
-
-        Log.d(TAG, "Sending general notification: $title")
-
-        // Create an intent using className instead of direct class reference
-        val intent = createMainActivityIntent(context).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        }
-
-        // Create pending intent with compatibility handling
-        val pendingIntent = getPendingIntent(context, 0, intent)
-
-        // Create notification
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle(title)
-            .setContentText(message)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setContentIntent(pendingIntent)
-            .setAutoCancel(true)
-            .setVibrate(longArrayOf(0, 250, 250, 250))  // Add vibration explicitly
-
         try {
-            notificationManager.notify(title.hashCode(), builder.build())
-            Log.d(TAG, "General notification sent successfully: $title")
-        } catch (e: SecurityException) {
-            // Handle permission not granted
-            Log.e(TAG, "Permission denied when sending general notification", e)
+            // Ensure notification channels are created
+            createNotificationChannels(context)
+
+            val intent = Intent().apply {
+                setClassName(
+                    context.packageName,
+                    MAIN_ACTIVITY_CLASS_NAME
+                )
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                title.hashCode(),
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setContentTitle(title)
+                .setContentText(message)
+                .setStyle(NotificationCompat.BigTextStyle()
+                    .bigText(message)
+                    .setBigContentTitle(title))
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .setVibrate(longArrayOf(0, 250, 250, 250))
+                .setSound(android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION))
+                .build()
+
+            with(NotificationManagerCompat.from(context)) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    if (context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        notify(title.hashCode(), notification)
+                        Log.d(TAG, "General notification sent: $title (Android 13+)")
+                    } else {
+                        Log.e(TAG, "Notification permission not granted for Android 13+")
+                    }
+                } else {
+                    notify(title.hashCode(), notification)
+                    Log.d(TAG, "General notification sent: $title (Pre-Android 13)")
+                }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error sending general notification", e)
         }
@@ -196,49 +221,6 @@ object TaskyNotificationService {
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT
             )
-        }
-    }
-
-    /**
-     * Send an immediate test notification
-     * Useful for debugging notification permissions
-     */
-    fun sendTestNotification(context: Context) {
-        Log.d(TAG, "Sending immediate test notification")
-
-        try {
-            // Create a simple Task object for the notification
-            val testTask = Task(
-                uuid = "test-${System.currentTimeMillis()}",
-                title = "Notification Test",
-                description = "This is a test notification to verify that notifications are working properly.",
-                status = "PENDING",
-                taskType = "",
-                deadlineDate = null,
-                deadlineTime = null,
-                isRecurring = false,
-                recurrencePattern = null,
-                recurrenceInterval = 0,
-                recurrenceEndDate = null
-            )
-
-            // Send both types of notifications to test both channels
-            sendTaskDueNotification(
-                context,
-                testTask,
-                "⏰ Task Due Test",
-                "This is a test of the task notification system"
-            )
-
-            sendGeneralNotification(
-                context,
-                "Notification System Test",
-                "If you see this, notifications are working correctly!"
-            )
-
-            Log.d(TAG, "Test notifications sent successfully")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to send test notification", e)
         }
     }
 }

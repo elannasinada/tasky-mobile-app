@@ -1,5 +1,6 @@
 package io.tasky.taskyapp.task.presentation.listing
 
+import android.app.Activity
 import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -35,10 +36,14 @@ import javax.inject.Inject
 class TaskViewModel @Inject constructor(
     private val useCases: TaskUseCases,
     @ApplicationContext private val context: Context,
-    private val notificationScheduler: NotificationScheduler
+    private val notificationScheduler: NotificationScheduler,
+    private val premiumManager: PremiumManager
 ) : ViewModel() {
     private val _state = MutableStateFlow(TaskState())
-    val state: StateFlow<TaskState> = _state
+    val state: StateFlow<TaskState> = _state.asStateFlow()
+
+    private val _eventFlow = MutableSharedFlow<UiEvent>()
+    val eventFlow = _eventFlow.asSharedFlow()
 
     private val tasks = mutableListOf<Task>()
     private var searchJob: Job? = null
@@ -48,6 +53,10 @@ class TaskViewModel @Inject constructor(
     var userData: UserData? = null
 
     private val TAG = "TaskViewModel"
+
+    init {
+        getTasks(null)
+    }
 
     fun getRecentlyDeletedTask(): Task? {
         return recentlyDeletedTask
@@ -61,48 +70,26 @@ class TaskViewModel @Inject constructor(
 
     fun onEvent(event: TaskEvent) {
         when (event) {
-            is TaskEvent.SearchedForTask -> {
-                searchJob?.cancel()
-                searchJob = viewModelScope.launch {
-                    event.filter.takeIf {
-                        it.isNotEmpty()
-                    }?.let {
-                        delay(300L)
-                    }
-                    _state.update {
-                        state.value.copy(
-                            tasks = tasks.filterBy(event.filter),
-                        )
-                    }
-                }
+            is TaskEvent.GetTasks -> {
+                getTasks(event.userData)
             }
-
-            is TaskEvent.RequestDelete -> {
-                with(event.task) {
-                    deleteTask(this)
-                    recentlyDeletedTask = this
-                }
+            is TaskEvent.DeleteTask -> {
+                deleteTask(event.task)
             }
-
-            is TaskEvent.RestoreTask -> {
-                restoreTask(event.task)
-            }
-
             is TaskEvent.CompleteTask -> {
                 completeTask(event.task)
             }
-
-            is TaskEvent.UpdateTaskStatus -> {
-                updateTaskStatus(event.task, event.newStatus)
+            is TaskEvent.RestoreTask -> {
+                restoreTask(event.task)
             }
-
             is TaskEvent.EnsureNotifications -> {
                 ensureNotificationsForTasks()
             }
         }
     }
 
-    fun getTasks(userData: UserData) {
+    fun getTasks(userData: UserData?) {
+        this.userData = userData
         getTasksJob?.cancel()
         getTasksJob = useCases.getTasksUseCase(userData).onEach { result ->
             when (result) {
@@ -115,6 +102,7 @@ class TaskViewModel @Inject constructor(
                         _state.update {
                             it.copy(
                                 tasks = fetchedTasks,
+                                showPremiumDialog = !premiumManager.canAddMoreTasks(fetchedTasks.size)
                             )
                         }
                         checkForApproachingDeadlines()
@@ -433,9 +421,6 @@ class TaskViewModel @Inject constructor(
             // First, verify notification channels are set up
             TaskyNotificationService.createNotificationChannels(context)
 
-            // Send a test notification
-            TaskyNotificationService.sendTestNotification(context)
-
             // Create an immediate test task with notification
             val cal = Calendar.getInstance()
             cal.add(Calendar.MINUTE, 1)
@@ -484,4 +469,27 @@ class TaskViewModel @Inject constructor(
             }
         }
     }
+
+    fun onPremiumDialogDismiss() {
+        _state.update { it.copy(showPremiumDialog = false) }
+    }
+
+    fun onPremiumUpgrade(activity: Activity) {
+        premiumManager.launchPremiumPurchase(activity)
+    }
+}
+
+data class TaskState(
+    val tasks: List<Task> = emptyList(),
+    val loading: Boolean = false,
+    val error: String? = null,
+    val showPremiumDialog: Boolean = false
+)
+
+sealed class TaskEvent {
+    data class GetTasks(val userData: UserData?) : TaskEvent()
+    data class DeleteTask(val task: Task) : TaskEvent()
+    data class CompleteTask(val task: Task) : TaskEvent()
+    data class RestoreTask(val task: Task) : TaskEvent()
+    object EnsureNotifications : TaskEvent()
 }

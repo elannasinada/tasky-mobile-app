@@ -122,7 +122,6 @@ class MainActivity : ComponentActivity() {
     private fun setupNotifications() {
         Log.d(TAG, "Setting up notifications")
         TaskyNotificationService.createNotificationChannels(this)
-        TaskyNotificationService.sendTestNotification(this)
     }
 
     @ExperimentalMaterialApi
@@ -288,7 +287,6 @@ class MainActivity : ComponentActivity() {
                                 onTestNotification = {
                                     // Direct test of notifications - this should immediately show a notification
                                     Log.d(TAG, "Test notification button clicked")
-                                    TaskyNotificationService.sendTestNotification(this@MainActivity)
                                     
                                     // Also try to trigger task notifications check
                                     taskViewModel.onEvent(TaskEvent.EnsureNotifications)

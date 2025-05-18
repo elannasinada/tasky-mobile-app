@@ -26,13 +26,14 @@ class TaskNotificationReceiver : BroadcastReceiver() {
         val taskType = intent.getStringExtra("taskType") ?: ""
         val taskDeadline = intent.getStringExtra("taskDeadline") ?: ""
         val isReminderNotification = intent.getBooleanExtra("isReminderNotification", false)
+        val minutesRemaining = intent.getIntExtra("minutesRemaining", 15)
 
         if (taskId == null || taskTitle == null) {
             Log.e(TAG, "Task ID or title is null")
             return
         }
 
-        Log.d(TAG, "Processing notification for task: $taskTitle (reminder: $isReminderNotification)")
+        Log.d(TAG, "Processing notification for task: $taskTitle (reminder: $isReminderNotification, minutes: $minutesRemaining)")
 
         // Create a simplified Task object for notification
         val task = Task(
@@ -50,14 +51,31 @@ class TaskNotificationReceiver : BroadcastReceiver() {
         )
 
         try {
+            // Ensure notification channels are created
+            TaskyNotificationService.createNotificationChannels(context)
+
             if (isReminderNotification) {
-                // Send a 15-minute reminder notification
-                Log.d(TAG, "Sending 15-minute reminder notification for task: ${task.title}")
+                // Format the time message based on minutes remaining
+                val timeMessage = when {
+                    minutesRemaining <= 0 -> "Deadline has passed"
+                    minutesRemaining == 1 -> "1 minute"
+                    minutesRemaining < 60 -> "$minutesRemaining minutes"
+                    else -> {
+                        val hours = minutesRemaining / 60
+                        val remainingMinutes = minutesRemaining % 60
+                        when {
+                            remainingMinutes == 0 -> "$hours hour${if (hours > 1) "s" else ""}"
+                            else -> "$hours hour${if (hours > 1) "s" else ""} and $remainingMinutes minute${if (remainingMinutes > 1) "s" else ""}"
+                        }
+                    }
+                }
+
+                Log.d(TAG, "Sending reminder notification for task: ${task.title} with $timeMessage remaining")
                 TaskyNotificationService.sendTaskDueNotification(
                     context,
                     task,
-                    "Task Due Soon",
-                    "\"${task.title}\" is due in 15 minutes"
+                    "Task Due Soon: ${task.title}",
+                    "Only $timeMessage remaining to complete this task"
                 )
             } else {
                 // Send the deadline reached notification
@@ -65,14 +83,24 @@ class TaskNotificationReceiver : BroadcastReceiver() {
                 TaskyNotificationService.sendTaskDueNotification(
                     context,
                     task,
-                    "Task Due Now",
-                    "\"${task.title}\" deadline has arrived"
+                    "Task Due Now: ${task.title}",
+                    "Deadline has been reached for this task"
                 )
             }
 
             Log.d(TAG, "Notification sent successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error sending notification", e)
+            // Try to send an error notification
+            try {
+                TaskyNotificationService.sendGeneralNotification(
+                    context,
+                    "Notification Error",
+                    "Failed to send notification for task: ${task.title}"
+                )
+            } catch (e2: Exception) {
+                Log.e(TAG, "Failed to send error notification", e2)
+            }
         }
     }
 }

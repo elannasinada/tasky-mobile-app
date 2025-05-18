@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.util.Calendar
+import java.util.*
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
@@ -112,6 +112,7 @@ class TaskDetailsViewModel @Inject constructor(
 
                 // Create a task object to use for notification scheduling
                 val createdTask = Task(
+                    uuid = UUID.randomUUID().toString(), // Generate a UUID for notification purposes
                     title = title,
                     description = description,
                     taskType = _state.value.task!!.taskType,
@@ -125,7 +126,10 @@ class TaskDetailsViewModel @Inject constructor(
                 )
 
                 // Schedule notification for the newly created task
-                scheduleNotificationForTask(createdTask)
+                if (status == TaskStatus.PENDING.name) {
+                    Log.d(TAG, "Scheduling notification for newly created task: ${title}")
+                    scheduleNotificationForTask(createdTask)
+                }
 
                 _eventFlow.emit(UiEvent.Finish)
             } catch (e: Exception) {
@@ -166,6 +170,9 @@ class TaskDetailsViewModel @Inject constructor(
                     recurrenceEndDate = if (isRecurring && !recurrenceEndDate.isNullOrBlank()) recurrenceEndDate else null
                 )
 
+                // Always cancel existing notifications first to avoid duplicates
+                notificationScheduler.cancelTaskReminder(task)
+                
                 // Create an updated task for notification scheduling
                 val updatedTask = task.copy(
                     title = title,
@@ -182,10 +189,8 @@ class TaskDetailsViewModel @Inject constructor(
                 // Handle notifications for the updated task
                 if (updatedTask.status == TaskStatus.PENDING.name) {
                     // If task is pending, schedule a notification
+                    Log.d(TAG, "Scheduling notification for updated task: ${title}")
                     scheduleNotificationForTask(updatedTask)
-                } else {
-                    // Otherwise cancel any existing notifications
-                    notificationScheduler.cancelTaskReminder(updatedTask)
                 }
 
                 _eventFlow.emit(UiEvent.Finish)
@@ -204,15 +209,38 @@ class TaskDetailsViewModel @Inject constructor(
         if (task.status == TaskStatus.PENDING.name && !task.deadlineDate.isNullOrEmpty() && !task.deadlineTime.isNullOrEmpty()) {
             Log.d(TAG, "Scheduling notification for new/updated task: ${task.title}")
 
-            // Schedule the notification reminder (15 min before due time)
-            notificationScheduler.scheduleTaskReminder(task)
-            
-            // Show a confirmation toast via event flow
-            viewModelScope.launch {
-                _eventFlow.emit(UiEvent.ShowToast("Reminder scheduled for \"${task.title}\""))
+            try {
+                // Parse deadline datetime to check if it's soon
+                val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+                val date = dateFormat.parse(task.deadlineDate!!) ?: return
+                val time = timeFormat.parse(task.deadlineTime!!) ?: return
+
+                val timeCal = Calendar.getInstance().apply {
+                    setTime(time)
+                }
+                
+                val deadlineCal = Calendar.getInstance().apply {
+                    setTime(date)
+                    set(Calendar.HOUR_OF_DAY, timeCal.get(Calendar.HOUR_OF_DAY))
+                    set(Calendar.MINUTE, timeCal.get(Calendar.MINUTE))
+                    set(Calendar.SECOND, 0)
+                }
+
+                val now = Calendar.getInstance()
+                val diff = deadlineCal.timeInMillis - now.timeInMillis
+                
+                Log.d(TAG, "Time difference to deadline: ${diff/1000} seconds (${diff/60000} minutes)")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error parsing deadline", e)
             }
             
+            // Schedule the notification reminder
+            notificationScheduler.scheduleTaskReminder(task)
+            
             Log.d(TAG, "Notification scheduled for: ${task.deadlineDate} ${task.deadlineTime}")
+        } else {
+            Log.d(TAG, "Not scheduling notification: status=${task.status}, date=${task.deadlineDate}, time=${task.deadlineTime}")
         }
     }
 }
