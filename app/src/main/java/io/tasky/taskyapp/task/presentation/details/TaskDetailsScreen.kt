@@ -37,6 +37,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -54,6 +57,11 @@ import io.tasky.taskyapp.core.util.createDatePickerDialog
 import io.tasky.taskyapp.core.util.createTimePickerDialog
 import io.tasky.taskyapp.task.domain.model.TaskStatus
 import io.tasky.taskyapp.task.domain.model.RecurrencePattern
+import io.tasky.taskyapp.core.presentation.PremiumDialog
+import kotlinx.coroutines.flow.collectLatest
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @ExperimentalMaterial3Api
 @ExperimentalComposeUiApi
@@ -63,6 +71,7 @@ fun TaskDetailsScreen(
     state: TaskDetailsState,
     onRequestInsert: (String, String, String, String, String, Boolean, String?, Int, String?) -> Unit,
     onRequestUpdate: (String, String, String, String, String, Boolean, String?, Int, String?) -> Unit,
+    viewModel: TaskDetailsViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
     val title = remember {
         mutableStateOf(state.task?.title ?: "")
@@ -103,6 +112,8 @@ fun TaskDetailsScreen(
         mutableStateOf(state.task?.recurrenceEndDate?.replace("-", "/") ?: "")
     }
 
+    var showPremiumDialog by remember { mutableStateOf(false) }
+
     LaunchedEffect(state.task?.uuid) {
         state.task?.let { task ->
             isRecurring.value = task.isRecurring
@@ -112,6 +123,21 @@ fun TaskDetailsScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.eventFlow.collectLatest { event ->
+            when (event) {
+                TaskDetailsViewModel.UiEvent.ShowPremiumDialog -> {
+                    showPremiumDialog = true
+                }
+                TaskDetailsViewModel.UiEvent.Finish -> {
+                    navController.popBackStack()
+                }
+                is TaskDetailsViewModel.UiEvent.ShowToast -> {
+                    // Toast is handled in MainActivity
+                }
+            }
+        }
+    }
 
     val showRecurrencePatternDropdown = remember { mutableStateOf(false) }
 
@@ -133,6 +159,16 @@ fun TaskDetailsScreen(
             recurrenceInterval.value = task.recurrenceInterval
             recurrenceEndDate.value = task.recurrenceEndDate?.replace("-", "/") ?: ""
         }
+    }
+
+    if (showPremiumDialog) {
+        PremiumDialog(
+            onDismiss = { showPremiumDialog = false },
+            onUpgrade = {
+                // You can trigger the upgrade flow here if needed
+                showPremiumDialog = false
+            }
+        )
     }
 
     Scaffold(
@@ -390,31 +426,33 @@ fun TaskDetailsScreen(
                     .padding(horizontal = 72.dp, vertical = 16.dp),
                 text = stringResource(R.string.finish)
             ) {
+                if (title.value.isBlank()) {
+                    return@DefaultTextButton
+                }
+                
                 if (state.task?.uuid != null) {
-                    // Update existing task
                     onRequestUpdate.invoke(
-                        title.value,
-                        description.value,
-                        date.value,
-                        time.value,
+                        title.value.trim(),
+                        description.value.trim(),
+                        date.value.trim(),
+                        time.value.trim(),
                         status.value,
-                        isRecurring.value,  // Pass the current UI state value
+                        isRecurring.value,  
                         if (isRecurring.value) recurrencePattern.value else null,
                         if (isRecurring.value) recurrenceInterval.value else 1,
-                        if (isRecurring.value && recurrenceEndDate.value.isNotBlank()) recurrenceEndDate.value else null
+                        if (isRecurring.value && recurrenceEndDate.value.isNotBlank()) recurrenceEndDate.value.trim() else null
                     )
                 } else {
-                    // Insert new task
                     onRequestInsert.invoke(
-                        title.value,
-                        description.value,
-                        date.value,
-                        time.value,
+                        title.value.trim(),
+                        description.value.trim(),
+                        date.value.trim(),
+                        time.value.trim(),
                         status.value,
-                        isRecurring.value,  // Pass the current UI state value
+                        isRecurring.value,  
                         if (isRecurring.value) recurrencePattern.value else null,
                         if (isRecurring.value) recurrenceInterval.value else 1,
-                        if (isRecurring.value && recurrenceEndDate.value.isNotBlank()) recurrenceEndDate.value else null
+                        if (isRecurring.value && recurrenceEndDate.value.isNotBlank()) recurrenceEndDate.value.trim() else null
                     )
                 }
             }
@@ -430,6 +468,18 @@ private fun DateAndTimePickers(
     time: MutableState<String>,
 ) {
     val context = LocalContext.current
+    
+    // Set default values for date and time if empty
+    if (date.value.isEmpty()) {
+        val dateFormat = SimpleDateFormat("yyyy/MM/dd", Locale.getDefault())
+        date.value = dateFormat.format(Date())
+    }
+    
+    if (time.value.isEmpty()) {
+        val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+        time.value = timeFormat.format(Date())
+    }
+    
     val datePicker = context.createDatePickerDialog(date, isSystemInDarkTheme())
     val timePicker = context.createTimePickerDialog(time, isSystemInDarkTheme())
 

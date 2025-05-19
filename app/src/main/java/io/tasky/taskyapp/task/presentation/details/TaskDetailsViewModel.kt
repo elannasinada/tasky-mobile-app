@@ -17,18 +17,21 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
+import io.tasky.taskyapp.core.domain.PremiumManager
 
 @HiltViewModel
 class TaskDetailsViewModel @Inject constructor(
     private val useCases: TaskUseCases,
     @ApplicationContext private val context: Context,
-    private val notificationScheduler: NotificationScheduler
+    private val notificationScheduler: NotificationScheduler,
+    private val premiumManager: PremiumManager
 ) : ViewModel() {
     private val _state = MutableStateFlow(TaskDetailsState())
     val state: StateFlow<TaskDetailsState> = _state
@@ -40,6 +43,7 @@ class TaskDetailsViewModel @Inject constructor(
 
     sealed class UiEvent {
         data class ShowToast(val message: String) : UiEvent()
+        object ShowPremiumDialog : UiEvent()
         object Finish : UiEvent()
     }
 
@@ -50,6 +54,7 @@ class TaskDetailsViewModel @Inject constructor(
     fun onEvent(event: TaskDetailsEvent) {
         when (event) {
             is TaskDetailsEvent.RequestInsert -> {
+                Log.d(TAG, "RequestInsert received with title: ${event.title}, date: ${event.date}, time: ${event.time}")
                 insertTask(
                     title = event.title,
                     description = event.description,
@@ -63,6 +68,7 @@ class TaskDetailsViewModel @Inject constructor(
                 )
             }
             is TaskDetailsEvent.RequestUpdate -> {
+                Log.d(TAG, "RequestUpdate received with title: ${event.title}, date: ${event.date}, time: ${event.time}")
                 updateTask(
                     title = event.title,
                     description = event.description,
@@ -76,7 +82,14 @@ class TaskDetailsViewModel @Inject constructor(
                 )
             }
             is TaskDetailsEvent.SetTaskData -> {
-                _state.value = _state.value.copy(task = event.task)
+                Log.d(TAG, "SetTaskData received: ${event.task}")
+                if (event.task.taskType.isBlank()) {
+                    // Set a default task type if none is provided
+                    _state.value = _state.value.copy(task = event.task.copy(taskType = "PERSONAL"))
+                    Log.d(TAG, "Set default task type to PERSONAL")
+                } else {
+                    _state.value = _state.value.copy(task = event.task)
+                }
             }
         }
     }
@@ -94,48 +107,125 @@ class TaskDetailsViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             try {
-                _state.value.task ?: return@launch
+                val stateTask = _state.value.task
+                val taskType = stateTask?.taskType?.takeIf { it.isNotBlank() } ?: "PERSONAL"
+                Log.d(TAG, "Starting task insertion process - task type: $taskType, title: $title")
 
-                useCases.insertTaskUseCase(
-                    userData = userData ?: return@launch,
-                    title = title,
-                    description = description,
-                    taskType = _state.value.task!!.taskType,
-                    deadlineDate = date,
-                    deadlineTime = time,
-                    status = TaskStatus.valueOf(status),
-                    isRecurring = isRecurring,
-                    recurrencePattern = if (isRecurring) recurrencePattern else null,
-                    recurrenceInterval = if (isRecurring) recurrenceInterval else 1,
-                    recurrenceEndDate = if (isRecurring && !recurrenceEndDate.isNullOrBlank()) recurrenceEndDate else null
-                )
+                // Check premium limit before inserting
+                try {
+                    val userData = this@TaskDetailsViewModel.userData
+                    if (userData == null) {
+                        Log.e(TAG, "Cannot create task: User data is null")
+                        _eventFlow.emit(UiEvent.ShowToast("Cannot create task: You need to be logged in"))
+                        return@launch
+                    }
 
-                // Create a task object to use for notification scheduling
-                val createdTask = Task(
-                    uuid = UUID.randomUUID().toString(), // Generate a UUID for notification purposes
-                    title = title,
-                    description = description,
-                    taskType = _state.value.task!!.taskType,
-                    deadlineDate = date,
-                    deadlineTime = time,
-                    status = status,
-                    isRecurring = isRecurring,
-                    recurrencePattern = if (isRecurring) recurrencePattern else null,
-                    recurrenceInterval = if (isRecurring) recurrenceInterval else 1,
-                    recurrenceEndDate = if (isRecurring && !recurrenceEndDate.isNullOrBlank()) recurrenceEndDate else null
-                )
+                    // Validate task fields
+                    if (title.isBlank()) {
+                        Log.e(TAG, "Cannot create task: Title is empty")
+                        _eventFlow.emit(UiEvent.ShowToast("Task title cannot be empty"))
+                        return@launch
+                    }
 
-                // Schedule notification for the newly created task
-                if (status == TaskStatus.PENDING.name) {
-                    Log.d(TAG, "Scheduling notification for newly created task: ${title}")
-                    scheduleNotificationForTask(createdTask)
+                    // Validate date and time if status is PENDING
+                    if (status == TaskStatus.PENDING.name && (date.isBlank() || time.isBlank())) {
+                        _eventFlow.emit(UiEvent.ShowToast("Pending tasks require date and time"))
+                        return@launch
+                    }
+
+                    // Get current tasks and check if premium limit is reached
+                    useCases.getTasksUseCase(userData).collect { resource ->
+                        if (resource.data != null) {
+                            val currentTaskCount = resource.data.size
+                            
+                            // Log the current task count and premium status for debugging
+                            val isPremium = premiumManager.isPremium.value
+                            Log.d(TAG, "Current task count: $currentTaskCount, Premium user: $isPremium")
+                            
+                            // Check if we can add more tasks - limit is MAX_FREE_TASKS (10) for non-premium users
+                            if (currentTaskCount >= PremiumManager.MAX_FREE_TASKS && !isPremium) {
+                                Log.d(TAG, "Premium limit reached. Tasks: $currentTaskCount, Limit: ${PremiumManager.MAX_FREE_TASKS}")
+                                _eventFlow.emit(UiEvent.ShowPremiumDialog)
+                                return@collect
+                            } else {
+                                // If premium check passes, proceed with insertion
+                                Log.d(TAG, "Premium check passed. Inserting task. Current count: $currentTaskCount")
+                                insertTaskAfterPremiumCheck(userData, title, description, date, time, status, isRecurring, 
+                                    recurrencePattern, recurrenceInterval, recurrenceEndDate)
+                                return@collect
+                            }
+                        }
+                    }
+                    return@launch // Return early as the insertion will be handled in the collect block
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error checking premium status", e)
+                    // If we can't check premium status, allow the insertion to proceed
+                    insertTaskAfterPremiumCheck(userData ?: return@launch, title, description, date, time, status, isRecurring, 
+                        recurrencePattern, recurrenceInterval, recurrenceEndDate)
                 }
-
-                _eventFlow.emit(UiEvent.Finish)
             } catch (e: Exception) {
                 e.message?.let {
                     _eventFlow.emit(UiEvent.ShowToast(it))
                 }
+            }
+        }
+    }
+
+    private suspend fun insertTaskAfterPremiumCheck(
+        userData: UserData,
+        title: String,
+        description: String,
+        date: String,
+        time: String,
+        status: String,
+        isRecurring: Boolean,
+        recurrencePattern: String?,
+        recurrenceInterval: Int,
+        recurrenceEndDate: String?
+    ) {
+        try {
+            val taskType = _state.value.task?.taskType?.takeIf { it.isNotBlank() } ?: "PERSONAL"
+            Log.d(TAG, "Inserting task: $title with type: $taskType, date: $date, time: $time")
+
+            useCases.insertTaskUseCase(
+                userData = userData,
+                title = title,
+                description = description,
+                taskType = taskType,
+                deadlineDate = date,
+                deadlineTime = time,
+                status = TaskStatus.valueOf(status),
+                isRecurring = isRecurring,
+                recurrencePattern = if (isRecurring) recurrencePattern else null,
+                recurrenceInterval = if (isRecurring) recurrenceInterval else 1,
+                recurrenceEndDate = if (isRecurring && !recurrenceEndDate.isNullOrBlank()) recurrenceEndDate else null
+            )
+
+            // Create a task object to use for notification scheduling
+            val createdTask = Task(
+                uuid = UUID.randomUUID().toString(),
+                title = title,
+                description = description,
+                taskType = taskType,
+                deadlineDate = date,
+                deadlineTime = time,
+                status = status,
+                isRecurring = isRecurring,
+                recurrencePattern = if (isRecurring) recurrencePattern else null,
+                recurrenceInterval = if (isRecurring) recurrenceInterval else 1,
+                recurrenceEndDate = if (isRecurring && !recurrenceEndDate.isNullOrBlank()) recurrenceEndDate else null
+            )
+
+            // Schedule notification for the newly created task
+            if (status == TaskStatus.PENDING.name) {
+                Log.d(TAG, "Scheduling notification for newly created task: ${title}")
+                scheduleNotificationForTask(createdTask)
+            }
+
+            _eventFlow.emit(UiEvent.Finish)
+        } catch (e: Exception) {
+            e.message?.let {
+                _eventFlow.emit(UiEvent.ShowToast(it))
             }
         }
     }
@@ -154,6 +244,12 @@ class TaskDetailsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val task = _state.value.task ?: return@launch
+
+                // Validate date and time if status is PENDING
+                if (status == TaskStatus.PENDING.name && (date.isBlank() || time.isBlank())) {
+                    _eventFlow.emit(UiEvent.ShowToast("Pending tasks require date and time"))
+                    return@launch
+                }
 
                 useCases.updateTaskUseCase(
                     userData = userData ?: return@launch,

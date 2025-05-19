@@ -1,7 +1,10 @@
 package io.tasky.taskyapp.task.presentation.listing
 
+import android.app.Activity
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,6 +39,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -46,10 +50,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.NavHostController
 import io.tasky.taskyapp.R
+import io.tasky.taskyapp.core.presentation.PremiumDialog
 import io.tasky.taskyapp.core.presentation.navigation.DrawerBody
 import io.tasky.taskyapp.core.presentation.navigation.DrawerHeader
 import io.tasky.taskyapp.core.presentation.navigation.MainScreens
@@ -78,7 +85,8 @@ fun TasksScreen(
     onRequestDelete: (Task) -> Unit,
     onRestoreTask: () -> Unit,
     onSearchTask: (String) -> Unit,
-    onTestNotification: () -> Unit = {}
+    onTestNotification: () -> Unit = {},
+    viewModel: TaskViewModel
 ) {
     val selectedTaskType = remember {
         mutableStateOf("")
@@ -87,7 +95,7 @@ fun TasksScreen(
     val bottomSheetState = rememberModalBottomSheetState(
         initialValue = ModalBottomSheetValue.Hidden,
         skipHalfExpanded = true,
-        confirmStateChange = {
+        confirmValueChange = {
             if (it == ModalBottomSheetValue.Hidden) {
                 selectedTaskType.value = ""
             }
@@ -96,6 +104,12 @@ fun TasksScreen(
     )
     val lifecycle = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    val showDebugDialog = remember { mutableStateOf(false) }
+    val debugMessage = remember { mutableStateOf("") }
+    val activity = context as? Activity
+    val isActivityAvailable = activity != null
 
     BackHandler(enabled = bottomSheetState.isVisible) {
         coroutineScope.launch {
@@ -128,18 +142,73 @@ fun TasksScreen(
             }
         },
     ) {
-        TasksScaffold(
-            navController = navController,
-            coroutineScope = coroutineScope,
-            bottomSheetState = bottomSheetState,
-            userData = userData,
-            state = state,
-            onRequestDelete = onRequestDelete,
-            onRestoreTask = onRestoreTask,
-            onSearchTask = onSearchTask,
-            onTestNotification = onTestNotification,
-            onSignOut = onSignOut,
-        )
+        Box(modifier = Modifier.fillMaxSize()) {
+            TasksScaffold(
+                navController = navController,
+                coroutineScope = coroutineScope,
+                bottomSheetState = bottomSheetState,
+                userData = userData,
+                state = state,
+                onRequestDelete = onRequestDelete,
+                onRestoreTask = onRestoreTask,
+                onSearchTask = onSearchTask,
+                onTestNotification = onTestNotification,
+                onSignOut = onSignOut,
+                onShowPremiumDialog = { viewModel.onPremiumDialogShow() }
+            )
+
+            if (state.showPremiumDialog) {
+                PremiumDialog(
+                    onDismiss = { viewModel.onPremiumDialogDismiss() },
+                    onUpgrade = {
+                        if (isActivityAvailable) {
+                            try {
+                                viewModel.onPremiumUpgrade(activity!!)
+                            } catch (e: Exception) {
+                                debugMessage.value = "Billing Error: ${e.message ?: "Unknown error"}"
+                                showDebugDialog.value = true
+                            }
+                        } else {
+                            Log.e("TasksScreen", "Context is not an Activity: $context")
+                        }
+                    }
+                )
+            }
+
+            if (showDebugDialog.value) {
+                Dialog(
+                    onDismissRequest = { showDebugDialog.value = false },
+                    properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .fillMaxWidth(0.9f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            androidx.compose.material.Text(
+                                text = "Debug Info",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            androidx.compose.material.Text(
+                                text = debugMessage.value,
+                                modifier = Modifier.padding(vertical = 16.dp),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            androidx.compose.material.Button(
+                                onClick = { showDebugDialog.value = false }
+                            ) {
+                                androidx.compose.material.Text(text = "Dismiss")
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -158,6 +227,7 @@ private fun TasksScaffold(
     onSearchTask: (String) -> Unit,
     onTestNotification: () -> Unit = {},
     onSignOut: () -> Unit,
+    onShowPremiumDialog: () -> Unit
 ) {
     val context = LocalContext.current
     val search = remember {
@@ -235,8 +305,12 @@ private fun TasksScaffold(
                 FloatingActionButton(
                     containerColor = MaterialTheme.colorScheme.primary,
                     onClick = {
-                        coroutineScope.launch {
-                            bottomSheetState.show()
+                        if (state.tasks.size >= 10) {
+                            onShowPremiumDialog()
+                        } else {
+                            coroutineScope.launch {
+                                bottomSheetState.show()
+                            }
                         }
                     },
                 ) {

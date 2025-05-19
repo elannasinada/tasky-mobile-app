@@ -3,8 +3,9 @@ package io.tasky.taskyapp.core.domain
 import android.app.Activity
 import android.content.Context
 import android.util.Log
-import com.android.billingclient.api.*
+import android.app.AlertDialog
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.tasky.taskyapp.core.billing.PremiumPurchasesUpdatedListener
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
@@ -15,129 +16,56 @@ class PremiumManager @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     private val TAG = "PremiumManager"
-    private var billingClient: BillingClient
     private val _isPremium = MutableStateFlow(false)
     val isPremium: StateFlow<Boolean> = _isPremium
 
     companion object {
-        const val PREMIUM_SKU = "tasky_premium_monthly"
-        const val MAX_FREE_TASKS = 20
-    }
-
-    init {
-        billingClient = BillingClient.newBuilder(context)
-            .setListener(purchasesUpdatedListener)
-            .enablePendingPurchases()
-            .build()
-
-        connectToPlayBilling()
-    }
-
-    private val purchasesUpdatedListener =
-        PurchasesUpdatedListener { billingResult, purchases ->
-            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK && purchases != null) {
-                for (purchase in purchases) {
-                    handlePurchase(purchase)
-                }
-            } else if (billingResult.responseCode == BillingClient.BillingResponseCode.USER_CANCELED) {
-                Log.d(TAG, "User cancelled the purchase")
-            } else {
-                Log.e(TAG, "Purchase failed: ${billingResult.debugMessage}")
-            }
-        }
-
-    private fun connectToPlayBilling() {
-        billingClient.startConnection(object : BillingClientStateListener {
-            override fun onBillingSetupFinished(billingResult: BillingResult) {
-                if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                    Log.d(TAG, "Billing client connected successfully")
-                    queryPurchases()
-                } else {
-                    Log.e(TAG, "Billing client connection failed: ${billingResult.debugMessage}")
-                }
-            }
-
-            override fun onBillingServiceDisconnected() {
-                Log.d(TAG, "Billing client disconnected")
-                // Try to reconnect
-                connectToPlayBilling()
-            }
-        })
-    }
-
-    private fun queryPurchases() {
-        billingClient.queryPurchasesAsync(
-            QueryPurchasesParams.newBuilder()
-                .setProductType(BillingClient.ProductType.SUBS)
-                .build()
-        ) { billingResult, purchases ->
-            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                for (purchase in purchases) {
-                    if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED) {
-                        _isPremium.value = true
-                        break
-                    }
-                }
-            }
-        }
-    }
-
-    private fun handlePurchase(purchase: Purchase) {
-        if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED) {
-            if (!purchase.isAcknowledged) {
-                val acknowledgePurchaseParams = AcknowledgePurchaseParams.newBuilder()
-                    .setPurchaseToken(purchase.purchaseToken)
-                    .build()
-                billingClient.acknowledgePurchase(acknowledgePurchaseParams) { billingResult ->
-                    if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                        _isPremium.value = true
-                        Log.d(TAG, "Purchase acknowledged successfully")
-                    }
-                }
-            } else {
-                _isPremium.value = true
-            }
-        }
+        const val MAX_FREE_TASKS = 10
+        const val PREMIUM_PRICE = "$4.99"
+        const val PREMIUM_PERIOD = "month"
     }
 
     fun launchPremiumPurchase(activity: Activity) {
-        val productList = listOf(
-            QueryProductDetailsParams.Product.newBuilder()
-                .setProductId(PREMIUM_SKU)
-                .setProductType(BillingClient.ProductType.SUBS)
-                .build()
-        )
-
-        val params = QueryProductDetailsParams.newBuilder()
-            .setProductList(productList)
-            .build()
-
-        billingClient.queryProductDetailsAsync(params) { billingResult, productDetailsList ->
-            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                if (productDetailsList.isNotEmpty()) {
-                    val productDetails = productDetailsList[0]
-                    val offerToken = productDetails.subscriptionOfferDetails?.get(0)?.offerToken
+        Log.d(TAG, "Starting premium purchase flow")
+        
+        try {
+            // Create and show the subscription details dialog
+            val dialog = AlertDialog.Builder(activity)
+                .setTitle("Upgrade to Premium")
+                .setMessage("""
+                    Premium Subscription Details:
                     
-                    if (offerToken != null) {
-                        val billingFlowParams = BillingFlowParams.newBuilder()
-                            .setProductDetailsParamsList(
-                                listOf(
-                                    BillingFlowParams.ProductDetailsParams.newBuilder()
-                                        .setProductDetails(productDetails)
-                                        .setOfferToken(offerToken)
-                                        .build()
-                                )
-                            )
-                            .build()
-
-                        billingClient.launchBillingFlow(activity, billingFlowParams)
-                    }
+                    • Price: $PREMIUM_PRICE per $PREMIUM_PERIOD
+                    
+                    Would you like to proceed with the purchase?
+                """.trimIndent())
+                .setPositiveButton("Proceed to Payment") { _, _ ->
+                    // Here you would typically redirect to your payment page
+                    // For now, we'll just show a toast
+                    android.widget.Toast.makeText(
+                        activity,
+                        "Payment integration coming soon!",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
                 }
-            }
+                .setNegativeButton("Cancel") { dialog, _ ->
+                    dialog.dismiss()
+                }
+                .create()
+            
+            dialog.show()
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception in launchPremiumPurchase", e)
+            android.widget.Toast.makeText(activity, "Error: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 
     fun canAddMoreTasks(currentTaskCount: Int): Boolean {
         return isPremium.value || currentTaskCount < MAX_FREE_TASKS
+    }
+
+    // For testing purposes - you can call this to simulate a successful purchase
+    fun simulatePremiumPurchase() {
+        _isPremium.value = true
     }
 } 

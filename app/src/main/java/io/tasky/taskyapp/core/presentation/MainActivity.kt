@@ -20,6 +20,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -274,7 +275,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 onRequestDelete = { task ->
-                                    taskViewModel.onEvent(TaskEvent.RequestDelete(task))
+                                    taskViewModel.onEvent(TaskEvent.DeleteTask(task))
                                 },
                                 onRestoreTask = {
                                     taskViewModel.getRecentlyDeletedTask()?.let { task ->
@@ -282,7 +283,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 onSearchTask = { filter ->
-                                    taskViewModel.onEvent(TaskEvent.SearchedForTask(filter))
+                                    taskViewModel.onSearchTask(filter)
                                 },
                                 onTestNotification = {
                                     // Direct test of notifications - this should immediately show a notification
@@ -311,7 +312,8 @@ class MainActivity : ComponentActivity() {
                                     taskViewModel.onTaskCreated(testTask)
                                     
                                     toaster.showToast("Test notification sent - check your notifications")
-                                }
+                                },
+                                viewModel = taskViewModel
                             )
                         }
 
@@ -331,6 +333,9 @@ class MainActivity : ComponentActivity() {
                                         }
                                         is TaskDetailsViewModel.UiEvent.ShowToast -> {
                                             toaster.showToast(event.message)
+                                        }
+                                        is TaskDetailsViewModel.UiEvent.ShowPremiumDialog -> {
+                                            // Premium dialog is handled internally in the TaskDetailsScreen
                                         }
                                     }
                                 }

@@ -112,15 +112,25 @@ class NotificationScheduler @Inject constructor(
 
             // If deadline is within 15 minutes, send immediate notification
             if (minutesRemaining <= 15) {
-                Log.d(TAG, "Deadline is within 15 minutes, sending immediate notification. Minutes remaining: $minutesRemaining")
+                val formattedMinutes = minutesRemaining.toInt()
+                Log.d(TAG, "Deadline is within 15 minutes, sending immediate notification. Minutes remaining: $formattedMinutes")
                 
-                // Send immediate notification
-                TaskyNotificationService.sendTaskDueNotification(
-                    context,
-                    task,
-                    "Task Due Soon: ${task.title}",
-                    "Only $minutesRemaining minutes remaining to complete this task"
-                )
+                // Create intent for immediate broadcast instead of sending notification directly
+                val intent = Intent(context, TaskNotificationReceiver::class.java).apply {
+                    putExtra("taskId", task.uuid)
+                    putExtra("taskTitle", task.title)
+                    putExtra("taskDescription", task.description ?: "")
+                    putExtra("taskType", task.taskType)
+                    putExtra("taskDeadline", "${task.deadlineDate} ${task.deadlineTime}")
+                    putExtra("isReminderNotification", true)
+                    putExtra("minutesRemaining", formattedMinutes)
+                }
+                
+                // Send the intent to the receiver instead of sending notification directly
+                // This ensures consistent notification handling
+                intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
+                context.sendBroadcast(intent)
+                Log.d(TAG, "Broadcast sent for immediate notification with $formattedMinutes minutes remaining")
             } else {
                 // Schedule 15-minute reminder
                 val reminderCalendar = calendar.clone() as Calendar
