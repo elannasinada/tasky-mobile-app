@@ -85,6 +85,9 @@ class TaskViewModel @Inject constructor(
             is TaskEvent.RestoreTask -> {
                 restoreTask(event.task)
             }
+            is TaskEvent.SearchTask -> {
+                onSearchTask(event.query)
+            }
             is TaskEvent.EnsureNotifications -> {
                 ensureNotificationsForTasks()
             }

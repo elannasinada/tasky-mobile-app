@@ -1,5 +1,6 @@
 package io.tasky.taskyapp.task.presentation.listing
 
+import android.content.Context
 import app.cash.turbine.test
 import assertk.assertThat
 import assertk.assertions.hasSize
@@ -8,12 +9,16 @@ import assertk.assertions.isEqualTo
 import assertk.assertions.isFalse
 import assertk.assertions.isNotEqualTo
 import assertk.assertions.isTrue
+import io.tasky.taskyapp.core.domain.PremiumManager
+import io.tasky.taskyapp.core.service.NotificationScheduler
 import io.tasky.taskyapp.sign_in.domain.use_cases.userData
+import io.tasky.taskyapp.task.domain.model.TaskStatus
 import io.tasky.taskyapp.task.domain.use_cases.TaskUseCases
 import io.tasky.taskyapp.task.domain.use_cases.task
 import io.tasky.taskyapp.task.domain.use_cases.tasks
 import io.tasky.taskyapp.task.presentation.fakeUseCases
 import io.tasky.taskyapp.util.MainCoroutineExtension
+import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -26,11 +31,19 @@ import org.junit.jupiter.api.extension.ExtendWith
 internal class TaskViewModelTest {
     private lateinit var useCases: TaskUseCases
     private lateinit var viewModel: TaskViewModel
+    private val mockContext = mockk<Context>(relaxed = true)
+    private val mockNotificationScheduler = mockk<NotificationScheduler>(relaxed = true)
+    private val mockPremiumManager = mockk<PremiumManager>(relaxed = true)
 
     @BeforeEach
     fun setUp() {
         useCases = fakeUseCases()
-        viewModel = TaskViewModel(useCases)
+        viewModel = TaskViewModel(
+            useCases,
+            mockContext,
+            mockNotificationScheduler,
+            mockPremiumManager
+        )
         viewModel.userData = userData()
     }
 
@@ -39,8 +52,8 @@ internal class TaskViewModelTest {
         val task = task()
 
         viewModel.state.test {
-            viewModel.onEvent(TaskEvent.RequestDelete(task))
-            viewModel.onEvent(TaskEvent.RestoreTask)
+            viewModel.onEvent(TaskEvent.DeleteTask(task))
+            viewModel.onEvent(TaskEvent.RestoreTask(task))
 
             val emission1 = awaitItem()
             assertThat(emission1.tasks).isEmpty()
@@ -54,7 +67,7 @@ internal class TaskViewModelTest {
                 assertThat(description).isEqualTo(task.description)
                 assertThat(deadlineDate).isEqualTo(task.deadlineDate)
                 assertThat(deadlineTime).isEqualTo(task.deadlineTime)
-                assertThat(deadlineDate).isEqualTo(task.deadlineDate)
+                assertThat(status).isEqualTo(task.status)
             }
             assertThat(emission2.loading).isTrue()
 
@@ -69,7 +82,7 @@ internal class TaskViewModelTest {
         val task = task()
 
         viewModel.state.test {
-            viewModel.onEvent(TaskEvent.RequestDelete(task))
+            viewModel.onEvent(TaskEvent.DeleteTask(task))
 
             val emission1 = awaitItem()
             assertThat(emission1.tasks).isEmpty()
@@ -92,29 +105,31 @@ internal class TaskViewModelTest {
                 taskType = it.taskType,
                 deadlineDate = it.deadlineDate!!,
                 deadlineTime = it.deadlineTime!!,
+                status = TaskStatus.PENDING
             )
         }
         viewModel.getTasks(viewModel.userData!!)
         advanceUntilIdle()
 
         viewModel.state.test {
-            viewModel.onEvent(TaskEvent.SearchedForTask("Task title1"))
+            viewModel.onEvent(TaskEvent.SearchTask("Task title1"))
+            advanceUntilIdle()
 
             val emission1 = awaitItem()
-            assertThat(emission1.tasks).hasSize(7)
+            assertThat(emission1.tasks).hasSize(1)
             assertThat(emission1.loading).isFalse()
 
             val emission2 = awaitItem()
             assertThat(emission2.tasks).hasSize(1)
             with(emission2.tasks.first()) {
-                val task = tasks().first()
+                val searchedTask = tasks().first()
 
-                assertThat(uuid).isNotEqualTo(task.uuid)
-                assertThat(title).isEqualTo(task.title)
-                assertThat(description).isEqualTo(task.description)
-                assertThat(deadlineDate).isEqualTo(task.deadlineDate)
-                assertThat(deadlineTime).isEqualTo(task.deadlineTime)
-                assertThat(deadlineDate).isEqualTo(task.deadlineDate)
+                assertThat(uuid).isNotEqualTo(searchedTask.uuid)
+                assertThat(title).isEqualTo(searchedTask.title)
+                assertThat(description).isEqualTo(searchedTask.description)
+                assertThat(deadlineDate).isEqualTo(searchedTask.deadlineDate)
+                assertThat(deadlineTime).isEqualTo(searchedTask.deadlineTime)
+                assertThat(status).isEqualTo(searchedTask.status)
             }
             assertThat(emission2.loading).isFalse()
         }
@@ -131,13 +146,15 @@ internal class TaskViewModelTest {
                 taskType = it.taskType,
                 deadlineDate = it.deadlineDate!!,
                 deadlineTime = it.deadlineTime!!,
+                status = TaskStatus.PENDING
             )
         }
         viewModel.getTasks(viewModel.userData!!)
         advanceUntilIdle()
 
         viewModel.state.test {
-            viewModel.onEvent(TaskEvent.SearchedForTask(""))
+            viewModel.onEvent(TaskEvent.SearchTask(""))
+            advanceUntilIdle()
 
             val emission = awaitItem()
             assertThat(emission.tasks).hasSize(7)

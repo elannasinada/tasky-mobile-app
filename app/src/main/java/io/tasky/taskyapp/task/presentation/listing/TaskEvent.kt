@@ -8,5 +8,6 @@ sealed class TaskEvent {
     data class DeleteTask(val task: Task) : TaskEvent()
     data class CompleteTask(val task: Task) : TaskEvent()
     data class RestoreTask(val task: Task) : TaskEvent()
+    data class SearchTask(val query: String) : TaskEvent()
     object EnsureNotifications : TaskEvent()
 }

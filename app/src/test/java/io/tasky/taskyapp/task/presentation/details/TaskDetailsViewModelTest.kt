@@ -3,9 +3,14 @@ package io.tasky.taskyapp.task.presentation.details
 import app.cash.turbine.test
 import assertk.assertThat
 import assertk.assertions.isEqualTo
+import android.content.Context
+import io.tasky.taskyapp.core.domain.PremiumManager
+import io.tasky.taskyapp.core.service.GeminiService
+import io.tasky.taskyapp.core.service.NotificationScheduler
 import io.tasky.taskyapp.sign_in.domain.use_cases.userData
 import io.tasky.taskyapp.task.domain.use_cases.TaskUseCases
 import io.tasky.taskyapp.task.domain.use_cases.task
+import io.tasky.taskyapp.task.domain.model.TaskStatus
 import io.tasky.taskyapp.task.presentation.fakeUseCases
 import io.tasky.taskyapp.util.MainCoroutineExtension
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -13,6 +18,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
+import io.mockk.mockk
 
 @ExperimentalCoroutinesApi
 @ExtendWith(MainCoroutineExtension::class)
@@ -20,11 +26,21 @@ internal class TaskDetailsViewModelTest {
     private lateinit var useCases: TaskUseCases
     private lateinit var viewModel: TaskDetailsViewModel
     private val userData = userData()
+    private val mockContext = mockk<Context>(relaxed = true)
+    private val mockNotificationScheduler = mockk<NotificationScheduler>(relaxed = true)
+    private val mockPremiumManager = mockk<PremiumManager>(relaxed = true)
+    private val mockGeminiService = mockk<GeminiService>(relaxed = true)
 
     @BeforeEach
     fun setUp() {
         useCases = fakeUseCases()
-        viewModel = TaskDetailsViewModel(useCases)
+        viewModel = TaskDetailsViewModel(
+            useCases,
+            mockContext,
+            mockNotificationScheduler,
+            mockPremiumManager,
+            mockGeminiService
+        )
         viewModel.userData = userData
     }
 
@@ -40,6 +56,7 @@ internal class TaskDetailsViewModelTest {
                     description = task.description!!,
                     date = task.deadlineDate!!,
                     time = task.deadlineTime!!,
+                    status = TaskStatus.PENDING.name
                 )
             )
 
@@ -60,6 +77,7 @@ internal class TaskDetailsViewModelTest {
                     description = task.description!!,
                     date = task.deadlineDate!!,
                     time = task.deadlineTime!!,
+                    status = TaskStatus.PENDING.name
                 )
             )
 
@@ -84,6 +102,7 @@ internal class TaskDetailsViewModelTest {
                     description = task.description!!,
                     date = task.deadlineDate!!,
                     time = task.deadlineTime!!,
+                    status = TaskStatus.PENDING.name
                 )
             )
 
@@ -108,6 +127,7 @@ internal class TaskDetailsViewModelTest {
                     description = task.description!!,
                     date = task.deadlineDate!!,
                     time = task.deadlineTime!!,
+                    status = TaskStatus.PENDING.name
                 )
             )
 
@@ -128,6 +148,7 @@ internal class TaskDetailsViewModelTest {
                     description = task.description!!,
                     date = task.deadlineDate!!,
                     time = task.deadlineTime!!,
+                    status = TaskStatus.PENDING.name
                 )
             )
 
@@ -152,6 +173,7 @@ internal class TaskDetailsViewModelTest {
                     description = task.description!!,
                     date = task.deadlineDate!!,
                     time = task.deadlineTime!!,
+                    status = TaskStatus.PENDING.name
                 )
             )
 
