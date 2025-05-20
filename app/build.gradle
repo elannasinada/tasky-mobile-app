@@ -3,9 +3,14 @@ plugins {
     id 'com.android.application'
     id 'dagger.hilt.android.plugin'
     id 'kotlin-kapt'
-    id 'com.google.gms.google-services'
     id 'com.google.firebase.crashlytics'
 }
+
+if (!gradle.startParameter.taskNames.any { it.contains('dokka') }) {
+    apply plugin: 'com.google.gms.google-services'
+}
+
+
 
 android {
     namespace 'io.tasky.taskyapp'
