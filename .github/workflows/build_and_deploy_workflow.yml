@@ -10,9 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
-
-      - name: Fetch master branch
+      - name: Checkout repository
         uses: actions/checkout@v2
 
       - name: Set up JDK 17
@@ -29,11 +27,6 @@ jobs:
           GOOGLE_SERVICES: ${{ secrets.GOOGLE_SERVICES }}
         run: echo $GOOGLE_SERVICES > app/google-services.json
 
-      - name: Decode google-services.json
-        env:
-          GOOGLE_SERVICES: ${{ secrets.GOOGLE_SERVICES }}
-        run: echo $GOOGLE_SERVICES > app/google-services.json
-
       - name: Build Release APK
         run: ./gradlew clean assembleRelease
 
@@ -41,7 +34,7 @@ jobs:
         run: cd app/build/outputs/apk/release && mv app-release-unsigned.apk Tasky.apk
 
       - name: Upload APK
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tasky-apk
           path: 'app/build/outputs/apk/release/Tasky.apk'
