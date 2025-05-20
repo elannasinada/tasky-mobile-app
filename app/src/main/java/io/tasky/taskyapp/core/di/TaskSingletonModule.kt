@@ -14,7 +14,6 @@ import io.tasky.taskyapp.task.domain.use_cases.DeleteTaskUseCase
 import io.tasky.taskyapp.task.domain.use_cases.GeminiPriorityUseCase
 import io.tasky.taskyapp.task.domain.use_cases.GetTasksUseCase
 import io.tasky.taskyapp.task.domain.use_cases.InsertTaskUseCase
-import io.tasky.taskyapp.task.domain.use_cases.PredictTaskPriorityUseCase
 import io.tasky.taskyapp.task.domain.use_cases.TaskUseCases
 import io.tasky.taskyapp.task.domain.use_cases.UpdateTaskUseCase
 import javax.inject.Singleton
@@ -42,13 +41,12 @@ object TaskSingletonModule {
         getTasksUseCase = GetTasksUseCase(repository),
         insertTaskUseCase = InsertTaskUseCase(
             repository = repository, 
-            predictTaskPriorityUseCase = PredictTaskPriorityUseCase(context)
+            geminiPriorityUseCase = GeminiPriorityUseCase(geminiService)
         ),
         updateTaskUseCase = UpdateTaskUseCase(
             repository = repository,
-            predictTaskPriorityUseCase = PredictTaskPriorityUseCase(context)
+            geminiPriorityUseCase = GeminiPriorityUseCase(geminiService)
         ),
-        predictTaskPriorityUseCase = PredictTaskPriorityUseCase(context),
         geminiPriorityUseCase = GeminiPriorityUseCase(geminiService)
     )
     

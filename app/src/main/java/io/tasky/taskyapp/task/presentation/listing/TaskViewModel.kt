@@ -451,27 +451,18 @@ class TaskViewModel @Inject constructor(
             try {
                 _state.update { it.copy(loading = true) }
                 
-                // Try to use Gemini AI for enhanced task prioritization
-                val enhancedTask = if (useCases.geminiPriorityUseCase != null) {
-                    val priority = useCases.geminiPriorityUseCase.invoke(task)
-                    val insights = useCases.geminiPriorityUseCase.getTaskInsights(task)
-                    val dependencies = useCases.geminiPriorityUseCase.analyzeTaskDependencies(task, _state.value.tasks)
-                    
-                    // Update task with AI suggestions
-                    task.copy(
-                        priority = priority,
-                        description = task.description + (if (insights.isNotEmpty()) 
-                            "\n\nAI Insights: $insights" else "") +
-                            (if (dependencies.isNotEmpty()) 
-                            "\n\nDependencies: $dependencies" else "")
-                    )
-                } else {
-                    // Fallback to TensorFlow model if Gemini is not available
-                    val priority = useCases.predictTaskPriorityUseCase(task)
-                    task.copy(priority = priority)
-                }
+                val priority = useCases.geminiPriorityUseCase?.invoke(task) ?: 3 // Default medium priority
+                val insights = useCases.geminiPriorityUseCase?.getTaskInsights(task) ?: ""
+                val dependencies = useCases.geminiPriorityUseCase?.analyzeTaskDependencies(task, _state.value.tasks) ?: ""
                 
-                // Save the enhanced task
+                val enhancedTask = task.copy(
+                    priority = priority,
+                    description = task.description + (if (insights.isNotEmpty()) 
+                        "\n\nAI Insights: $insights" else "") +
+                        (if (dependencies.isNotEmpty()) 
+                        "\n\nDependencies: $dependencies" else "")
+                )
+                
                 useCases.insertTaskUseCase(
                     userData = userData ?: throw IllegalStateException("User data is null"),
                     title = enhancedTask.title,
@@ -521,20 +512,13 @@ class TaskViewModel @Inject constructor(
         }
     }
     
-    /**
-     * Uses AI to order tasks by priority, deadline, and dependencies
-     */
     fun orderTasksByPriority() {
         viewModelScope.launch {
             try {
                 _state.update { it.copy(loading = true) }
                 
-                // Use Gemini for intelligent ordering if available
-                val orderedTasks = if (useCases.geminiPriorityUseCase != null) {
-                    useCases.geminiPriorityUseCase.orderTasksByPriority(_state.value.tasks)
-                } else {
-                    // Fallback to simple ordering by priority and deadline
-                    _state.value.tasks.sortedWith(
+                val orderedTasks = useCases.geminiPriorityUseCase?.orderTasksByPriority(_state.value.tasks) 
+                    ?: _state.value.tasks.sortedWith(
                         compareByDescending<Task> { it.priority }
                             .thenBy { task ->
                                 task.deadlineDate?.let {
@@ -547,9 +531,7 @@ class TaskViewModel @Inject constructor(
                                 } ?: Long.MAX_VALUE
                             }
                     )
-                }
                 
-                // Update the state with ordered tasks
                 _state.update {
                     it.copy(
                         tasks = orderedTasks,
@@ -557,7 +539,6 @@ class TaskViewModel @Inject constructor(
                     )
                 }
                 
-                // Notify user
                 TaskyNotificationService.sendGeneralNotification(
                     context,
                     "Tasks Prioritized",
@@ -570,9 +551,6 @@ class TaskViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Search for tasks based on a filter string
-     */
     fun onSearchTask(filter: String) {
         searchJob?.cancel()
         searchJob = viewModelScope.launch {

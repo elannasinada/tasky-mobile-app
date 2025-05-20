@@ -57,7 +57,7 @@ class GeminiService @Inject constructor(
 ) {
     private val gson = Gson()
     private val TAG = "GeminiService"
-    private val API_KEY = "AIzaSyDKkEARzjodYn9QLzpsfJeMh-VN5iqUyVc" // Replace with your actual API key
+    private val API_KEY = "xxxxxxxxxxxxx" // Replace with your actual API key
     private val BASE_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent"
     
     private suspend fun callGemini(request: GeminiRequest): GeminiResponse? = withContext(Dispatchers.IO) {

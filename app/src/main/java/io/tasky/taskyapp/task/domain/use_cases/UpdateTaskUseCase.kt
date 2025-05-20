@@ -9,7 +9,7 @@ import io.tasky.taskyapp.task.domain.repository.TaskRepository
  */
 class UpdateTaskUseCase(
     private val repository: TaskRepository,
-    private val predictTaskPriorityUseCase: PredictTaskPriorityUseCase? = null
+    private val geminiPriorityUseCase: GeminiPriorityUseCase? = null
 ) {
     /**
      * Updates an existent task.
@@ -62,7 +62,7 @@ class UpdateTaskUseCase(
         )
 
         // Predict priority if predictor is available
-        val taskWithPriority = predictTaskPriorityUseCase?.let { predictor ->
+        val taskWithPriority = geminiPriorityUseCase?.let { predictor ->
             val priority = predictor.invoke(updatedTask)
             updatedTask.copy(priority = priority)
         } ?: updatedTask
