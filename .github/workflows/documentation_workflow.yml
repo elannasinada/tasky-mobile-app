@@ -30,7 +30,7 @@ jobs:
         run: ./gradlew clean app:dokkaHtml
 
       - name: Upload documentation
-        uses: actions/upload-artifact@latest
+        uses: actions/upload-artifact@v4
         with:
           name: Tasky-Documentation
           path: 'app/build/dokka/html'
