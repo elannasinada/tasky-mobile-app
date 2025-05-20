@@ -21,13 +21,10 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Decode google-services.json
+      - name: Decode Google Services JSON
         run: |
-          echo "${{ secrets.GOOGLE_SERVICES_B64 }}" | base64 -d > app/google-services.json
-          # Verify file was created properly
-          ls -la app/google-services.json
-          # Verify it's a valid JSON file
-          cat app/google-services.json | grep -v "client_info" || echo "Warning: File might be malformed"
+          echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > app/google-services.json
+  
 
       - name: Create local.properties
         run: |
