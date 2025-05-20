@@ -22,13 +22,16 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Decode google-services.json
+        env:
+          GOOGLE_SERVICES: ${{ secrets.GOOGLE_SERVICES }}
         run: |
-          echo "${{ secrets.GOOGLE_SERVICES }}" > app/google-services.json
-          cat app/google-services.json | grep -v 'secret' > /dev/null
+          echo "$GOOGLE_SERVICES" | base64 --decode > app/google-services.json
+          cat app/google-services.json | jq '.'
 
       - name: Create local.properties
         run: |
           echo "sdk.dir=$ANDROID_HOME" > local.properties
+          echo "gemini.api.key=${{ secrets.GEMINI_API_KEY }}" >> local.properties
           ls -la
           cat local.properties
           pwd
