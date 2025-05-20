@@ -1,34 +1,112 @@
-# **Table of Contents**
-- [Présentation du projet](#project-presentation)
+# README - Tasky Mobile App
 
-# Présentation du projet <a id="project-presentation"></a>
-<div style="text-align: center;">
-  <img src="" alt="Tasky logo" width="200">
-</div>
+# **Table des matières**
+- [Comment installer le projet?](#project-installation)
+- [Comment configurer le projet?](#project-configuration)
+- [Comment exécuter le projet?](#project-execution)
 
-<b>Tasky</b> est xxxx
-<br/> <br/> 
+# Installation du projet <a id="project-installation"></a>
 
-# Collaborators <a id="collaborators"></a>
+## Prérequis
+* Android Studio installé
+* JDK 17 (voir `build.gradle`)
+* Compte Firebase et Google Cloud Platform
+* Accès à Internet
 
-<table>
-  <tbody>
-    <tr>
-      <td align="center" valign="top" width="25%"><a href="https://www.linkedin.com/in/meriem-abboud2004"><img src="https://github.com/user-attachments/assets/f8f1f184-5b69-46f2-a91c-b5dba36b6745" width="120px;" alt="Team Member 1"/>
-      <br /> <sub><b>ABBOUD Meriem</b></sub></a></td>
-      <td align="center" valign="top" width="25%"><a href="https://www.linkedin.com/in/elannasinada/"><img src="https://github.com/user-attachments/assets/7e2da8a8-e0c8-4f89-b315-7f6db7204311" width="120px;" alt="Team Member 2"/>
-      <br /> <sub><b>EL ANNASI Nada</b></sub></a></td>
-      <td align="center" valign="top" width="25%"><a href="https://www.linkedin.com/in/salma-el-ghefyry-2613b7283/"><img src="https://github.com/user-attachments/assets/f6a8aa60-13a1-42bb-8149-528c5c7ad4ad" width="120px;" alt="Team Member 3"/>
-      <br /> <sub><b>EL GHEFYRY Salma</b></sub></a></td>
-      <td align="center" valign="top" width="25%"><a href="https://www.linkedin.com/in/ayoub-ghouzali-976369251/"><img src="https://github.com/user-attachments/assets/5f6b9981-ec71-43fa-85c4-1f3f9a8ec42a" width="120px;" alt="Team Member 4"/>
-      <br /> <sub><b>GHOUZALI Ayoub</b></sub></a></td>
-    </tr>
-  </tbody>
-</table>
+## Étapes
+1. Clonez le dépôt :
 
+```bash
+git clone https://github.com/elannasinada/tasky-mobile-app.git
+cd tasky-mobile-app
+```
 
-### License
-© 2025 Tasky. All rights reserved.
+2. Ouvrez le projet dans Android Studio (`File > Open`)
+3. Synchronisez avec Gradle (`Tools > Android > Sync Project with Gradle Files`)
 
-### Contact
-For more information, please contact the Tasky team.
+# Configuration du projet <a id="project-configuration"></a>
+
+## Firebase
+1. Créez un projet sur console.firebase.google.com
+2. Ajoutez votre app Android avec le package `io.tasky.taskyapp`
+3. Téléchargez et placez `google-services.json` dans `app/`
+4. Activez l'authentification Email/Password et Google
+5. Configurez la Realtime Database avec ces règles :
+
+```json
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null",
+    "$uid": {
+      ".read": "$uid === auth.uid",
+      ".write": "$uid === auth.uid"
+    }
+  }
+}
+```
+
+## Cloud Functions (pour Google Calendar)
+* Installez Firebase CLI :
+
+```bash
+npm install -g firebase-tools
+firebase login
+firebase init functions
+```
+
+* Configurez les variables d'environnement (remplacez par vos infos) :
+
+```bash
+firebase functions:config:set google.client_id="VOTRE_CLIENT_ID" \
+  google.client_secret="VOTRE_CLIENT_SECRET" \
+  google.redirect_uri="VOTRE_REDIRECT_URI" \
+  google.service_account_email="VOTRE_SERVICE_ACCOUNT_EMAIL" \
+  google.service_account_private_key="VOTRE_SERVICE_ACCOUNT_PRIVATE_KEY"
+```
+
+* Déployez les fonctions :
+
+```bash
+firebase deploy --only functions
+```
+
+## Google Calendar API
+1. Activez l'API dans la Console Google Cloud
+2. Créez des identifiants OAuth 2.0 :
+   * Application Android (package `io.tasky.taskyapp`, SHA-1 de certificat)
+   * Application Web (pour les Cloud Functions)
+3. Ajoutez l'ID client Web dans `res/values/strings.xml` :
+
+```xml
+<string name="default_web_client_id">VOTRE_WEB_CLIENT_ID</string>
+```
+
+## Clé API Gemini (optionnelle)
+* Obtenez votre clé sur Google AI Studio
+* Ajoutez dans `local.properties` à la racine :
+
+```properties
+gemini.api.key=VOTRE_CLE_API_GEMINI
+```
+
+# Exécution du projet <a id="project-execution"></a>
+
+## Préparation
+* Lancez un émulateur ou connectez un appareil physique compatible
+* Vérifiez la version minSdkVersion dans `build.gradle`
+
+## Démarrage
+* Sélectionnez la configuration `debug` dans Android Studio
+* Cliquez sur `Run`
+
+## Astuces debug
+* Vérifiez le fichier `google-services.json`
+* Contrôlez que les empreintes SHA-1/SHA-256 sont bien configurées dans Firebase
+* Surveillez les logs Firebase et Android Studio pour détecter erreurs
+
+# **License**
+© 2025 Tasky. Tous droits réservés.
+
+# **Contact**
+Pour plus d'informations, veuillez contacter l'équipe de Tasky.
