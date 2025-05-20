@@ -451,11 +451,11 @@ class TaskViewModel @Inject constructor(
             try {
                 _state.update { it.copy(loading = true) }
                 
-                // Try to use DeepSeek AI for enhanced task prioritization
-                val enhancedTask = if (useCases.deepSeekPriorityUseCase != null) {
-                    val priority = useCases.deepSeekPriorityUseCase.invoke(task)
-                    val insights = useCases.deepSeekPriorityUseCase.getTaskInsights(task)
-                    val dependencies = useCases.deepSeekPriorityUseCase.analyzeTaskDependencies(task, _state.value.tasks)
+                // Try to use Gemini AI for enhanced task prioritization
+                val enhancedTask = if (useCases.geminiPriorityUseCase != null) {
+                    val priority = useCases.geminiPriorityUseCase.invoke(task)
+                    val insights = useCases.geminiPriorityUseCase.getTaskInsights(task)
+                    val dependencies = useCases.geminiPriorityUseCase.analyzeTaskDependencies(task, _state.value.tasks)
                     
                     // Update task with AI suggestions
                     task.copy(
@@ -466,7 +466,7 @@ class TaskViewModel @Inject constructor(
                             "\n\nDependencies: $dependencies" else "")
                     )
                 } else {
-                    // Fallback to TensorFlow model if DeepSeek is not available
+                    // Fallback to TensorFlow model if Gemini is not available
                     val priority = useCases.predictTaskPriorityUseCase(task)
                     task.copy(priority = priority)
                 }
@@ -529,9 +529,9 @@ class TaskViewModel @Inject constructor(
             try {
                 _state.update { it.copy(loading = true) }
                 
-                // Use DeepSeek for intelligent ordering if available
-                val orderedTasks = if (useCases.deepSeekPriorityUseCase != null) {
-                    useCases.deepSeekPriorityUseCase.orderTasksByPriority(_state.value.tasks)
+                // Use Gemini for intelligent ordering if available
+                val orderedTasks = if (useCases.geminiPriorityUseCase != null) {
+                    useCases.geminiPriorityUseCase.orderTasksByPriority(_state.value.tasks)
                 } else {
                     // Fallback to simple ordering by priority and deadline
                     _state.value.tasks.sortedWith(
