@@ -92,8 +92,9 @@ dependencies {
     implementation 'com.google.http-client:google-http-client-gson:1.42.3'
 
     // TensorFlow Lite
-    implementation 'org.tensorflow:tensorflow-lite:2.8.0'
-    implementation 'org.tensorflow:tensorflow-lite-support:0.4.0'
+    implementation 'org.tensorflow:tensorflow-lite:2.14.0'
+    implementation 'org.tensorflow:tensorflow-lite-support:0.4.4'
+    implementation 'org.tensorflow:tensorflow-lite-metadata:0.4.4'
 
     // Firebase ML Kit
     implementation 'com.google.firebase:firebase-ml-natural-language:22.0.1'

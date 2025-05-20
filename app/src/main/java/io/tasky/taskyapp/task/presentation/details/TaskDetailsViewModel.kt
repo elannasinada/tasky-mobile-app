@@ -6,8 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.tasky.taskyapp.core.service.GeminiService
 import io.tasky.taskyapp.core.service.NotificationScheduler
-import io.tasky.taskyapp.core.service.TaskyNotificationService
 import io.tasky.taskyapp.sign_in.domain.model.UserData
 import io.tasky.taskyapp.task.domain.model.Task
 import io.tasky.taskyapp.task.domain.model.TaskStatus
@@ -17,7 +17,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -31,7 +30,8 @@ class TaskDetailsViewModel @Inject constructor(
     private val useCases: TaskUseCases,
     @ApplicationContext private val context: Context,
     private val notificationScheduler: NotificationScheduler,
-    private val premiumManager: PremiumManager
+    private val premiumManager: PremiumManager,
+    private val geminiService: GeminiService
 ) : ViewModel() {
     private val _state = MutableStateFlow(TaskDetailsState())
     val state: StateFlow<TaskDetailsState> = _state
@@ -61,6 +61,7 @@ class TaskDetailsViewModel @Inject constructor(
                     date = event.date,
                     time = event.time,
                     status = event.status,
+                    priority = event.priority,
                     isRecurring = event.isRecurring,
                     recurrencePattern = event.recurrencePattern,
                     recurrenceInterval = event.recurrenceInterval,
@@ -75,6 +76,7 @@ class TaskDetailsViewModel @Inject constructor(
                     date = event.date,
                     time = event.time,
                     status = event.status,
+                    priority = event.priority,
                     isRecurring = event.isRecurring,
                     recurrencePattern = event.recurrencePattern,
                     recurrenceInterval = event.recurrenceInterval,
@@ -90,6 +92,9 @@ class TaskDetailsViewModel @Inject constructor(
                 } else {
                     _state.value = _state.value.copy(task = event.task)
                 }
+                
+                // Get AI priority suggestion when task is loaded
+                getSuggestedPriority(event.task)
             }
         }
     }
@@ -100,6 +105,7 @@ class TaskDetailsViewModel @Inject constructor(
         date: String,
         time: String,
         status: String,
+        priority: Int = 0,
         isRecurring: Boolean = false,
         recurrencePattern: String? = null,
         recurrenceInterval: Int = 1,
@@ -128,7 +134,7 @@ class TaskDetailsViewModel @Inject constructor(
                     }
 
                     // Validate date and time if status is PENDING
-                    if (status == TaskStatus.PENDING.name && (date.isBlank() || time.isBlank())) {
+                    if (status == "PENDING" && (date.isBlank() || time.isBlank())) {
                         _eventFlow.emit(UiEvent.ShowToast("Pending tasks require date and time"))
                         return@launch
                     }
@@ -150,7 +156,7 @@ class TaskDetailsViewModel @Inject constructor(
                             } else {
                                 // If premium check passes, proceed with insertion
                                 Log.d(TAG, "Premium check passed. Inserting task. Current count: $currentTaskCount")
-                                insertTaskAfterPremiumCheck(userData, title, description, date, time, status, isRecurring, 
+                                insertTaskAfterPremiumCheck(userData, title, description, date, time, status, priority, isRecurring, 
                                     recurrencePattern, recurrenceInterval, recurrenceEndDate)
                                 return@collect
                             }
@@ -160,7 +166,7 @@ class TaskDetailsViewModel @Inject constructor(
                 } catch (e: Exception) {
                     Log.e(TAG, "Error checking premium status", e)
                     // If we can't check premium status, allow the insertion to proceed
-                    insertTaskAfterPremiumCheck(userData ?: return@launch, title, description, date, time, status, isRecurring, 
+                    insertTaskAfterPremiumCheck(userData ?: return@launch, title, description, date, time, status, priority, isRecurring, 
                         recurrencePattern, recurrenceInterval, recurrenceEndDate)
                 }
             } catch (e: Exception) {
@@ -178,6 +184,7 @@ class TaskDetailsViewModel @Inject constructor(
         date: String,
         time: String,
         status: String,
+        priority: Int,
         isRecurring: Boolean,
         recurrencePattern: String?,
         recurrenceInterval: Int,
@@ -201,23 +208,22 @@ class TaskDetailsViewModel @Inject constructor(
                 recurrenceEndDate = if (isRecurring && !recurrenceEndDate.isNullOrBlank()) recurrenceEndDate else null
             )
 
-            // Create a task object to use for notification scheduling
             val createdTask = Task(
                 uuid = UUID.randomUUID().toString(),
                 title = title,
                 description = description,
                 taskType = taskType,
-                deadlineDate = date,
+                deadlineDate = date.replace("/", "-"),
                 deadlineTime = time,
-                status = status,
+                status = TaskStatus.valueOf(status).name,
                 isRecurring = isRecurring,
                 recurrencePattern = if (isRecurring) recurrencePattern else null,
                 recurrenceInterval = if (isRecurring) recurrenceInterval else 1,
-                recurrenceEndDate = if (isRecurring && !recurrenceEndDate.isNullOrBlank()) recurrenceEndDate else null
+                recurrenceEndDate = if (isRecurring && !recurrenceEndDate.isNullOrBlank()) recurrenceEndDate?.replace("/", "-") else null,
+                priority = priority
             )
 
-            // Schedule notification for the newly created task
-            if (status == TaskStatus.PENDING.name) {
+            if (status == "PENDING") {
                 Log.d(TAG, "Scheduling notification for newly created task: ${title}")
                 scheduleNotificationForTask(createdTask)
             }
@@ -236,6 +242,7 @@ class TaskDetailsViewModel @Inject constructor(
         date: String,
         time: String,
         status: String,
+        priority: Int = 0,
         isRecurring: Boolean = false,
         recurrencePattern: String? = null,
         recurrenceInterval: Int = 1,
@@ -246,11 +253,13 @@ class TaskDetailsViewModel @Inject constructor(
                 val task = _state.value.task ?: return@launch
 
                 // Validate date and time if status is PENDING
-                if (status == TaskStatus.PENDING.name && (date.isBlank() || time.isBlank())) {
+                if (status == "PENDING" && (date.isBlank() || time.isBlank())) {
                     _eventFlow.emit(UiEvent.ShowToast("Pending tasks require date and time"))
                     return@launch
                 }
 
+                notificationScheduler.cancelTaskReminder(task)
+                
                 useCases.updateTaskUseCase(
                     userData = userData ?: return@launch,
                     task = task,
@@ -259,32 +268,27 @@ class TaskDetailsViewModel @Inject constructor(
                     taskType = task.taskType,
                     deadlineDate = date,
                     deadlineTime = time,
-                    status = status,
+                    status = TaskStatus.valueOf(status).name,
                     isRecurring = isRecurring,
                     recurrencePattern = if (isRecurring) recurrencePattern else null,
                     recurrenceInterval = if (isRecurring) recurrenceInterval else 1,
                     recurrenceEndDate = if (isRecurring && !recurrenceEndDate.isNullOrBlank()) recurrenceEndDate else null
                 )
-
-                // Always cancel existing notifications first to avoid duplicates
-                notificationScheduler.cancelTaskReminder(task)
                 
-                // Create an updated task for notification scheduling
                 val updatedTask = task.copy(
                     title = title,
                     description = description,
                     deadlineDate = date,
                     deadlineTime = time,
-                    status = status,
+                    status = TaskStatus.valueOf(status).name,
                     isRecurring = isRecurring,
                     recurrencePattern = if (isRecurring) recurrencePattern else null,
                     recurrenceInterval = if (isRecurring) recurrenceInterval else 1,
-                    recurrenceEndDate = if (isRecurring && !recurrenceEndDate.isNullOrBlank()) recurrenceEndDate else null
+                    recurrenceEndDate = if (isRecurring && !recurrenceEndDate.isNullOrBlank()) recurrenceEndDate else null,
+                    priority = priority
                 )
 
-                // Handle notifications for the updated task
-                if (updatedTask.status == TaskStatus.PENDING.name) {
-                    // If task is pending, schedule a notification
+                if (updatedTask.status == "PENDING") {
                     Log.d(TAG, "Scheduling notification for updated task: ${title}")
                     scheduleNotificationForTask(updatedTask)
                 }
@@ -298,11 +302,8 @@ class TaskDetailsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Schedule notifications for a task if it's pending and has a deadline
-     */
     private fun scheduleNotificationForTask(task: Task) {
-        if (task.status == TaskStatus.PENDING.name && !task.deadlineDate.isNullOrEmpty() && !task.deadlineTime.isNullOrEmpty()) {
+        if (task.status == "PENDING" && !task.deadlineDate.isNullOrEmpty() && !task.deadlineTime.isNullOrEmpty()) {
             Log.d(TAG, "Scheduling notification for new/updated task: ${task.title}")
 
             try {
@@ -337,6 +338,22 @@ class TaskDetailsViewModel @Inject constructor(
             Log.d(TAG, "Notification scheduled for: ${task.deadlineDate} ${task.deadlineTime}")
         } else {
             Log.d(TAG, "Not scheduling notification: status=${task.status}, date=${task.deadlineDate}, time=${task.deadlineTime}")
+        }
+    }
+    
+    private fun getSuggestedPriority(task: Task) {
+        viewModelScope.launch {
+            try {
+                if (task.title.isNotBlank()) {
+                    val suggestedPriority = geminiService.suggestTaskPriority(task)
+                    _state.value = _state.value.copy(
+                        suggestedPriority = suggestedPriority
+                    )
+                    Log.d(TAG, "Got AI suggested priority: $suggestedPriority for task: ${task.title}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error getting AI priority suggestion: ${e.message}", e)
+            }
         }
     }
 }

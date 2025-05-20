@@ -349,7 +349,7 @@ class MainActivity : ComponentActivity() {
                                 TaskDetailsScreen(
                                     navController = navController,
                                     state = taskDetailsState,
-                                    onRequestInsert = { title, description, date, time, status, isRecurring, recurrencePattern, recurrenceInterval, recurrenceEndDate ->
+                                    onRequestInsert = { title, description, date, time, status, priority, isRecurring, recurrencePattern, recurrenceInterval, recurrenceEndDate ->
                                         taskDetailsViewModel.onEvent(
                                             TaskDetailsEvent.RequestInsert(
                                                 title = title,
@@ -357,6 +357,7 @@ class MainActivity : ComponentActivity() {
                                                 date = date,
                                                 time = time,
                                                 status = status,
+                                                priority = priority,
                                                 isRecurring = isRecurring,
                                                 recurrencePattern = recurrencePattern,
                                                 recurrenceInterval = recurrenceInterval,
@@ -364,7 +365,7 @@ class MainActivity : ComponentActivity() {
                                             )
                                         )
                                     },
-                                    onRequestUpdate = { title, description, date, time, status, isRecurring, recurrencePattern, recurrenceInterval, recurrenceEndDate ->
+                                    onRequestUpdate = { title, description, date, time, status, priority, isRecurring, recurrencePattern, recurrenceInterval, recurrenceEndDate ->
                                         taskDetailsViewModel.onEvent(
                                             TaskDetailsEvent.RequestUpdate(
                                                 title = title,
@@ -372,13 +373,14 @@ class MainActivity : ComponentActivity() {
                                                 date = date,
                                                 time = time,
                                                 status = status,
+                                                priority = priority,
                                                 isRecurring = isRecurring,
                                                 recurrencePattern = recurrencePattern,
                                                 recurrenceInterval = recurrenceInterval,
                                                 recurrenceEndDate = recurrenceEndDate
                                             )
                                         )
-                                    },
+                                    }
                                 )
                             }
                         }

@@ -6,10 +6,12 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import io.tasky.taskyapp.core.service.GeminiService
 import io.tasky.taskyapp.task.data.remote.RealtimeDatabaseClient
 import io.tasky.taskyapp.task.data.repository.TaskRepositoryImpl
 import io.tasky.taskyapp.task.domain.repository.TaskRepository
 import io.tasky.taskyapp.task.domain.use_cases.DeleteTaskUseCase
+import io.tasky.taskyapp.task.domain.use_cases.GeminiPriorityUseCase
 import io.tasky.taskyapp.task.domain.use_cases.GetTasksUseCase
 import io.tasky.taskyapp.task.domain.use_cases.InsertTaskUseCase
 import io.tasky.taskyapp.task.domain.use_cases.PredictTaskPriorityUseCase
@@ -33,7 +35,8 @@ object TaskSingletonModule {
     @Singleton
     fun providesTaskUseCases(
         repository: TaskRepository,
-        @ApplicationContext context: Context
+        @ApplicationContext context: Context,
+        geminiService: GeminiService
     ) = TaskUseCases(
         deleteTaskUseCase = DeleteTaskUseCase(repository),
         getTasksUseCase = GetTasksUseCase(repository),
@@ -45,6 +48,13 @@ object TaskSingletonModule {
             repository = repository,
             predictTaskPriorityUseCase = PredictTaskPriorityUseCase(context)
         ),
-        predictTaskPriorityUseCase = PredictTaskPriorityUseCase(context)
+        predictTaskPriorityUseCase = PredictTaskPriorityUseCase(context),
+        geminiPriorityUseCase = GeminiPriorityUseCase(geminiService)
     )
+    
+    @Provides
+    @Singleton
+    fun providesGeminiService(@ApplicationContext context: Context): GeminiService {
+        return GeminiService(context)
+    }
 }

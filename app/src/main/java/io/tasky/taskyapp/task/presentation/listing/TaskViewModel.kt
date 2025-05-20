@@ -444,6 +444,133 @@ class TaskViewModel @Inject constructor(
     }
 
     /**
+     * Adds a task with AI enhancements (priority suggestion, insights, dependencies analysis)
+     */
+    fun addTask(task: Task) {
+        viewModelScope.launch {
+            try {
+                _state.update { it.copy(loading = true) }
+                
+                // Try to use DeepSeek AI for enhanced task prioritization
+                val enhancedTask = if (useCases.deepSeekPriorityUseCase != null) {
+                    val priority = useCases.deepSeekPriorityUseCase.invoke(task)
+                    val insights = useCases.deepSeekPriorityUseCase.getTaskInsights(task)
+                    val dependencies = useCases.deepSeekPriorityUseCase.analyzeTaskDependencies(task, _state.value.tasks)
+                    
+                    // Update task with AI suggestions
+                    task.copy(
+                        priority = priority,
+                        description = task.description + (if (insights.isNotEmpty()) 
+                            "\n\nAI Insights: $insights" else "") +
+                            (if (dependencies.isNotEmpty()) 
+                            "\n\nDependencies: $dependencies" else "")
+                    )
+                } else {
+                    // Fallback to TensorFlow model if DeepSeek is not available
+                    val priority = useCases.predictTaskPriorityUseCase(task)
+                    task.copy(priority = priority)
+                }
+                
+                // Save the enhanced task
+                useCases.insertTaskUseCase(
+                    userData = userData ?: throw IllegalStateException("User data is null"),
+                    title = enhancedTask.title,
+                    description = enhancedTask.description ?: "",
+                    taskType = enhancedTask.taskType,
+                    deadlineDate = enhancedTask.deadlineDate ?: "",
+                    deadlineTime = enhancedTask.deadlineTime ?: "",
+                    status = TaskStatus.valueOf(enhancedTask.status),
+                    isRecurring = enhancedTask.isRecurring,
+                    recurrencePattern = enhancedTask.recurrencePattern,
+                    recurrenceInterval = enhancedTask.recurrenceInterval,
+                    recurrenceEndDate = enhancedTask.recurrenceEndDate
+                )
+                
+                // Schedule notifications if needed
+                onTaskCreated(enhancedTask)
+                
+                // Reload tasks
+                userData?.let { getTasks(it) }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error adding task with AI: ${e.message}", e)
+                
+                // Fallback to basic task addition
+                try {
+                    useCases.insertTaskUseCase(
+                        userData = userData ?: throw IllegalStateException("User data is null"),
+                        title = task.title,
+                        description = task.description ?: "",
+                        taskType = task.taskType,
+                        deadlineDate = task.deadlineDate ?: "",
+                        deadlineTime = task.deadlineTime ?: "",
+                        status = TaskStatus.valueOf(task.status),
+                        isRecurring = task.isRecurring,
+                        recurrencePattern = task.recurrencePattern,
+                        recurrenceInterval = task.recurrenceInterval,
+                        recurrenceEndDate = task.recurrenceEndDate
+                    )
+                    
+                    onTaskCreated(task)
+                    userData?.let { getTasks(it) }
+                } finally {
+                    _state.update { it.copy(loading = false) }
+                }
+            } finally {
+                _state.update { it.copy(loading = false) }
+            }
+        }
+    }
+    
+    /**
+     * Uses AI to order tasks by priority, deadline, and dependencies
+     */
+    fun orderTasksByPriority() {
+        viewModelScope.launch {
+            try {
+                _state.update { it.copy(loading = true) }
+                
+                // Use DeepSeek for intelligent ordering if available
+                val orderedTasks = if (useCases.deepSeekPriorityUseCase != null) {
+                    useCases.deepSeekPriorityUseCase.orderTasksByPriority(_state.value.tasks)
+                } else {
+                    // Fallback to simple ordering by priority and deadline
+                    _state.value.tasks.sortedWith(
+                        compareByDescending<Task> { it.priority }
+                            .thenBy { task ->
+                                task.deadlineDate?.let {
+                                    try {
+                                        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                                            .parse(it)?.time ?: Long.MAX_VALUE
+                                    } catch (e: Exception) {
+                                        Long.MAX_VALUE
+                                    }
+                                } ?: Long.MAX_VALUE
+                            }
+                    )
+                }
+                
+                // Update the state with ordered tasks
+                _state.update {
+                    it.copy(
+                        tasks = orderedTasks,
+                        loading = false
+                    )
+                }
+                
+                // Notify user
+                TaskyNotificationService.sendGeneralNotification(
+                    context,
+                    "Tasks Prioritized",
+                    "Your tasks have been intelligently ordered by priority and urgency"
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Error ordering tasks: ${e.message}", e)
+                _state.update { it.copy(loading = false) }
+            }
+        }
+    }
+
+    /**
      * Search for tasks based on a filter string
      */
     fun onSearchTask(filter: String) {

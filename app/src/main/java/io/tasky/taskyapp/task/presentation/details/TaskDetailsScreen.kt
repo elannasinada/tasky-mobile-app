@@ -1,7 +1,11 @@
 package io.tasky.taskyapp.task.presentation.details
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,18 +14,23 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.PriorityHigh
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.PriorityHigh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -48,7 +57,9 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import io.tasky.taskyapp.R
 import io.tasky.taskyapp.core.presentation.widgets.DefaultFilledTextField
@@ -69,8 +80,8 @@ import java.util.Locale
 fun TaskDetailsScreen(
     navController: NavHostController,
     state: TaskDetailsState,
-    onRequestInsert: (String, String, String, String, String, Boolean, String?, Int, String?) -> Unit,
-    onRequestUpdate: (String, String, String, String, String, Boolean, String?, Int, String?) -> Unit,
+    onRequestInsert: (String, String, String, String, String, Int, Boolean, String?, Int, String?) -> Unit,
+    onRequestUpdate: (String, String, String, String, String, Int, Boolean, String?, Int, String?) -> Unit,
     viewModel: TaskDetailsViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
     val title = remember {
@@ -110,6 +121,10 @@ fun TaskDetailsScreen(
 
     val recurrenceEndDate = remember {
         mutableStateOf(state.task?.recurrenceEndDate?.replace("-", "/") ?: "")
+    }
+
+    val priority = remember {
+        mutableStateOf(state.task?.priority ?: 0)
     }
 
     var showPremiumDialog by remember { mutableStateOf(false) }
@@ -214,6 +229,18 @@ fun TaskDetailsScreen(
             )
 
             DateAndTimePickers(date, time)
+
+            // Priority selection
+            PrioritySelector(
+                currentPriority = priority.value,
+                suggestedPriority = state.suggestedPriority,
+                onPrioritySelected = { newPriority -> 
+                    priority.value = newPriority 
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            )
 
             // Status selector
             Card(
@@ -437,6 +464,7 @@ fun TaskDetailsScreen(
                         date.value.trim(),
                         time.value.trim(),
                         status.value,
+                        priority.value,
                         isRecurring.value,  
                         if (isRecurring.value) recurrencePattern.value else null,
                         if (isRecurring.value) recurrenceInterval.value else 1,
@@ -449,6 +477,7 @@ fun TaskDetailsScreen(
                         date.value.trim(),
                         time.value.trim(),
                         status.value,
+                        priority.value,
                         isRecurring.value,  
                         if (isRecurring.value) recurrencePattern.value else null,
                         if (isRecurring.value) recurrenceInterval.value else 1,
@@ -535,5 +564,165 @@ private fun getIntervalText(pattern: String?, interval: Int): String {
         RecurrencePattern.MONTHLY.name -> if (interval == 1) "month" else "months"
         RecurrencePattern.YEARLY.name -> if (interval == 1) "year" else "years"
         else -> ""
+    }
+}
+
+@Composable
+fun PrioritySelector(
+    currentPriority: Int,
+    suggestedPriority: Int?,
+    onPrioritySelected: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
+            // AI Suggested Priority (if available)
+            suggestedPriority?.let { suggested ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                ) {
+                    Text(
+                        text = "AI Suggested:",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
+                    
+                    val priorityText = when(suggested) {
+                        0 -> "Low"
+                        1 -> "Medium"
+                        else -> "High"
+                    }
+                    
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                            .padding(1.dp)
+                    ) {
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            )
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.PriorityHigh,
+                                    contentDescription = "Priority",
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = priorityText,
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Priority Selection
+            Text(
+                text = "Select Priority:",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(bottom = 8.dp, top = if (suggestedPriority == null) 0.dp else 8.dp)
+            )
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // High Priority Button
+                PriorityButton(
+                    text = "High",
+                    isSelected = currentPriority == 2,
+                    color = Color(0xFFFFB4AB), // Red for high priority
+                    onClick = { onPrioritySelected(2) },
+                    modifier = Modifier.weight(1f)
+                )
+                
+                // Medium Priority Button
+                PriorityButton(
+                    text = "Medium",
+                    isSelected = currentPriority == 1,
+                    color = Color(0xFFFFD8A9), // Orange/amber for medium priority
+                    onClick = { onPrioritySelected(1) },
+                    modifier = Modifier.weight(1f)
+                )
+                
+                // Low Priority Button
+                PriorityButton(
+                    text = "Low",
+                    isSelected = currentPriority == 0,
+                    color = Color(0xFFA9DFFF), // Blue for low priority
+                    onClick = { onPrioritySelected(0) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun PriorityButton(
+    text: String,
+    isSelected: Boolean,
+    color: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = if (isSelected) {
+            modifier
+                .background(
+                    color = MaterialTheme.colorScheme.primary,
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(2.dp)
+        } else {
+            modifier
+        }
+    ) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.clickable { onClick() },
+            colors = CardDefaults.cardColors(
+                containerColor = color
+            )
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = text,
+                    color = Color.Black,
+                    style = MaterialTheme.typography.labelLarge,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
     }
 }
