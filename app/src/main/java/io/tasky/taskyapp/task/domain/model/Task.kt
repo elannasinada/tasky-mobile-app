@@ -18,7 +18,8 @@ data class Task(
     var recurrencePattern: String? = null, 
     var recurrenceInterval: Int = 1, 
     var recurrenceEndDate: String? = null,
-    var priority: Int = 0 // 0 = Low, 1 = Medium, 2 = High
+    var priority: Int = 0, // 0 = Low, 1 = Medium, 2 = High
+    var isPriorityManuallySet: Boolean = false // Track if priority was manually set by user
 ) {
     companion object {
         fun fromJson(json: String): Task = Gson().fromJson(json, Task::class.java)
@@ -44,7 +45,8 @@ data class Task(
                     is Number -> priority.toInt()
                     is String -> priority.toIntOrNull() ?: 0
                     else -> 0
-                }
+                },
+                isPriorityManuallySet = hashMap["isPriorityManuallySet"]?.toString()?.toBoolean() ?: false
             )
         }
     }
@@ -58,5 +60,14 @@ data class Task(
      */
     fun withPriority(priority: Int): Task {
         return this.copy(priority = priority)
+    }
+    
+    /**
+     * Creates a copy of this task with a manually set priority level.
+     * @param priority The priority level (0=low, 1=medium, 2=high)
+     * @return A new Task with the updated priority marked as manually set
+     */
+    fun withManualPriority(priority: Int): Task {
+        return this.copy(priority = priority, isPriorityManuallySet = true)
     }
 }
