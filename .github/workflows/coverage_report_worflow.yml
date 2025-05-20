@@ -27,7 +27,7 @@ jobs:
         run: echo $GOOGLE_SERVICES > app/google-services.json
 
       - name: Run Tests
-        run: ./gradlew clean createDebugUnitTestCoverageReport
+        run: ./gradlew clean createDebugUnitTestCoverageReport --warning-mode all
 
       - name: Upload Unit Tests Coverage Report
         uses: actions/upload-artifact@v4
