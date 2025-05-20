@@ -6,8 +6,17 @@ plugins {
 }
 
 if (!gradle.startParameter.taskNames.any { it.contains('dokka') }) {
-    apply plugin: 'com.google.gms.google-services'
-    apply plugin: 'com.google.firebase.crashlytics'
+    def googleServicesFile = file('google-services.json')
+    if (googleServicesFile.exists()) {
+        logger.lifecycle("Google services file found at ${googleServicesFile.absolutePath}")
+        apply plugin: 'com.google.gms.google-services'
+        apply plugin: 'com.google.firebase.crashlytics'
+    } else {
+        logger.warn("Warning: google-services.json not found at ${googleServicesFile.absolutePath}")
+        logger.warn("Firebase services may not be initialized correctly.")
+        apply plugin: 'com.google.gms.google-services'
+        apply plugin: 'com.google.firebase.crashlytics'
+    }
 }
 
 android {
