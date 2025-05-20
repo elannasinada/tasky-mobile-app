@@ -3,7 +3,7 @@
     "project_number": "630987618468",
     "firebase_url": "https://tasky-2f1b0-default-rtdb.europe-west1.firebasedatabase.app",
     "project_id": "tasky-2f1b0",
-    "storage_bucket": "tasky-2f1b0.firebasestorage.app"
+    "storage_bucket": "tasky-2f1b0.appspot.com"
   },
   "client": [
     {
