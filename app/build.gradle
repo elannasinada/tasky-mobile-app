@@ -27,9 +27,15 @@ android {
             useSupportLibrary true
         }
 
-        def localProperties = new Properties()
-        localProperties.load(project.rootProject.file("local.properties").newDataInputStream())
-        buildConfigField "String", "GEMINI_API_KEY", "\"${localProperties.getProperty('gemini.api.key')}\""
+        def geminiApiKey = "dummy-api-key"
+        def localPropertiesFile = project.rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            def localProperties = new Properties()
+            localProperties.load(localPropertiesFile.newDataInputStream())
+            geminiApiKey = localProperties.getProperty('gemini.api.key', 'dummy-api-key')
+        }
+
+        buildConfigField "String", "GEMINI_API_KEY", "\"${geminiApiKey}\""
     }
 
     buildTypes {
@@ -39,6 +45,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.debug
         }
     }
     compileOptions {
