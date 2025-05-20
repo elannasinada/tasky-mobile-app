@@ -26,6 +26,9 @@ class RealtimeDatabaseClientImpl(
 
     @Suppress("UNCHECKED_CAST")
     override fun getTasksFromUser(user: UserData) = flow {
+        // Emit loading state before fetching data
+        emit(Resource.Loading(true))
+        
         val result = database.child(user.userId ?: return@flow).get().await()
         val tasks = result.children.map {
             Task.fromSnapshot(it.value as HashMap<String, Any?>)

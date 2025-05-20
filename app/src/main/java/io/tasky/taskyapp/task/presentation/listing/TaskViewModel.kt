@@ -176,7 +176,7 @@ class TaskViewModel @Inject constructor(
                         )
 
                         // Schedule notification for the restored task
-                        notificationScheduler.scheduleTaskReminder(task)
+                        notificationScheduler.createNotificationsForTask(task)
                         Log.d(TAG, "Scheduled notification for restored task: ${task.title}")
                     }
                 }
@@ -228,7 +228,7 @@ class TaskViewModel @Inject constructor(
                     }
                 } else if (newStatus == TaskStatus.PENDING) {
                     // If status changed to PENDING, reschedule notification
-                    notificationScheduler.scheduleTaskReminder(task)
+                    notificationScheduler.createNotificationsForTask(task)
                     Log.d(
                         TAG,
                         "Rescheduled notification for task changed to pending: ${task.title}"
@@ -297,7 +297,7 @@ class TaskViewModel @Inject constructor(
                 )
 
                 // Schedule notification for the new recurring task
-                notificationScheduler.scheduleTaskReminder(nextTask)
+                notificationScheduler.createNotificationsForTask(nextTask)
                 Log.d(
                     TAG,
                     "Scheduled notification for new recurring task: ${nextTask.title}"
@@ -386,7 +386,7 @@ class TaskViewModel @Inject constructor(
     fun onTaskCreated(task: Task) {
         if (task.status == TaskStatus.PENDING.name && !task.deadlineDate.isNullOrEmpty()) {
             // Schedule notification
-            notificationScheduler.scheduleTaskReminder(task)
+            notificationScheduler.createNotificationsForTask(task)
             Log.d(TAG, "Scheduled notification for new task: ${task.title}")
 
             TaskyNotificationService.sendGeneralNotification(
@@ -451,18 +451,32 @@ class TaskViewModel @Inject constructor(
             try {
                 _state.update { it.copy(loading = true) }
                 
-                val priority = useCases.geminiPriorityUseCase?.invoke(task) ?: 3 // Default medium priority
+                // Only get AI priority if user hasn't set one
+                val priority = if (task.priority == 0) {
+                    useCases.geminiPriorityUseCase?.invoke(task) ?: 1
+                } else {
+                    task.priority
+                }
+                
+                // Get AI insights and dependencies
                 val insights = useCases.geminiPriorityUseCase?.getTaskInsights(task) ?: ""
                 val dependencies = useCases.geminiPriorityUseCase?.analyzeTaskDependencies(task, _state.value.tasks) ?: ""
                 
+                // Create enhanced task with AI suggestions
                 val enhancedTask = task.copy(
                     priority = priority,
-                    description = task.description + (if (insights.isNotEmpty()) 
-                        "\n\nAI Insights: $insights" else "") +
-                        (if (dependencies.isNotEmpty()) 
-                        "\n\nDependencies: $dependencies" else "")
+                    description = buildString {
+                        append(task.description ?: "")
+                        if (insights.isNotEmpty()) {
+                            append("\n\nAI Insights: $insights")
+                        }
+                        if (dependencies.isNotEmpty()) {
+                            append("\n\nDependencies: $dependencies")
+                        }
+                    }
                 )
                 
+                // Insert the enhanced task
                 useCases.insertTaskUseCase(
                     userData = userData ?: throw IllegalStateException("User data is null"),
                     title = enhancedTask.title,
@@ -485,7 +499,7 @@ class TaskViewModel @Inject constructor(
             } catch (e: Exception) {
                 Log.e(TAG, "Error adding task with AI: ${e.message}", e)
                 
-                // Fallback to basic task addition
+                // Fallback to basic task addition without AI enhancements
                 try {
                     useCases.insertTaskUseCase(
                         userData = userData ?: throw IllegalStateException("User data is null"),

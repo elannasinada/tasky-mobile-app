@@ -23,6 +23,10 @@ android {
         vectorDrawables {
             useSupportLibrary true
         }
+
+        def localProperties = new Properties()
+        localProperties.load(project.rootProject.file("local.properties").newDataInputStream())
+        buildConfigField "String", "GEMINI_API_KEY", "\"${localProperties.getProperty('gemini.api.key')}\""
     }
 
     buildTypes {
@@ -43,6 +47,7 @@ android {
     }
     buildFeatures {
         compose true
+        buildConfig true
     }
     composeOptions {
         kotlinCompilerExtensionVersion "1.4.3"

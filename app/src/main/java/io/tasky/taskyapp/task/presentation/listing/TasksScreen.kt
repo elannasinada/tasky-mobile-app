@@ -62,6 +62,7 @@ import io.tasky.taskyapp.core.presentation.navigation.DrawerHeader
 import io.tasky.taskyapp.core.presentation.navigation.MainScreens
 import io.tasky.taskyapp.core.presentation.navigation.MenuItem
 import io.tasky.taskyapp.core.presentation.widgets.TaskAppBar
+// import io.tasky.taskyapp.core.presentation.widgets.TaskShimmerCard // This doesn't exist
 import io.tasky.taskyapp.core.util.DefaultSearchBar
 import io.tasky.taskyapp.sign_in.domain.model.UserData
 import io.tasky.taskyapp.task.domain.model.Task
@@ -350,10 +351,10 @@ private fun TasksScaffold(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (state.loading) {
-                        items(3) {
+                        items(10) { index ->
                             TaskShimmerCard(
                                 modifier = Modifier
-                                    .fillMaxWidth()
+                                    .fillMaxWidth(),
                             )
                         }
                     } else {

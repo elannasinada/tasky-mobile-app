@@ -1,5 +1,10 @@
 package io.tasky.taskyapp.task.presentation.widgets
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,7 +24,11 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -37,6 +46,7 @@ import io.tasky.taskyapp.core.util.shimmerAnimation
 import io.tasky.taskyapp.task.domain.model.TaskType
 import io.tasky.taskyapp.ui.theme.Blue70
 import io.tasky.taskyapp.ui.theme.Purple80
+import kotlinx.coroutines.delay
 
 @Composable
 fun TaskShimmerCard(

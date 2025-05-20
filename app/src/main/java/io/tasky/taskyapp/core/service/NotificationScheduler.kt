@@ -29,7 +29,7 @@ class NotificationScheduler @Inject constructor(
      * 1. 15 minutes before deadline
      * 2. At the exact deadline time
      */
-    fun scheduleTaskReminder(task: Task) {
+    fun createNotificationsForTask(task: Task) {
         Log.d(TAG, "Attempting to schedule reminders for task: ${task.title}")
 
         if (task.status != TaskStatus.PENDING.name) {
@@ -156,13 +156,6 @@ class NotificationScheduler @Inject constructor(
             )
             Log.d(TAG, "Deadline notification scheduled for ${calendar.time}")
 
-            // Send confirmation notification
-            //TaskyNotificationService.sendGeneralNotification(
-            //    context,
-            //    "Reminder Set",
-            //    "Notifications have been scheduled for task: ${task.title}"
-            //)
-
             Log.d(TAG, "Successfully scheduled notifications for task: ${task.title}")
         } catch (e: Exception) {
             Log.e(TAG, "Error scheduling notifications", e)
@@ -276,7 +269,7 @@ class NotificationScheduler @Inject constructor(
                 // Cancel existing notifications first to avoid duplicates
                 cancelTaskReminder(task)
                 // Schedule fresh notifications
-                scheduleTaskReminder(task)
+                createNotificationsForTask(task)
             }
         }
     }
