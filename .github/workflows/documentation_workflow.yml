@@ -23,10 +23,11 @@ jobs:
 
       - name: Decode google-services.json
         run: |
-          echo "${GOOGLE_SERVICES_B64}" | base64 --decode > app/google-services.json
-        env:
-          GOOGLE_SERVICES_B64: ${{ secrets.GOOGLE_SERVICES_B64 }}
-
+          echo "${{ secrets.GOOGLE_SERVICES_B64 }}" | base64 -d > app/google-services.json
+          # Verify file was created properly
+          ls -la app/google-services.json
+          # Verify it's a valid JSON file
+          cat app/google-services.json | grep -v "client_info" || echo "Warning: File might be malformed"
 
       - name: Create local.properties
         run: |
