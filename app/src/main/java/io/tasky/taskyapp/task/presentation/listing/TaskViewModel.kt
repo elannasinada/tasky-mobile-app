@@ -454,8 +454,8 @@ class TaskViewModel @Inject constructor(
             try {
                 _state.update { it.copy(loading = true) }
                 
-                // Only get AI priority if user hasn't set one
-                val priority = if (task.priority == 0) {
+                // Only get AI priority if user hasn't manually set one
+                val priority = if (!task.isPriorityManuallySet) {
                     useCases.geminiPriorityUseCase?.invoke(task) ?: 1
                 } else {
                     task.priority
@@ -480,50 +480,35 @@ class TaskViewModel @Inject constructor(
                 )
                 
                 // Insert the enhanced task
-                useCases.insertTaskUseCase(
-                    userData = userData ?: throw IllegalStateException("User data is null"),
-                    title = enhancedTask.title,
-                    description = enhancedTask.description ?: "",
-                    taskType = enhancedTask.taskType,
-                    deadlineDate = enhancedTask.deadlineDate ?: "",
-                    deadlineTime = enhancedTask.deadlineTime ?: "",
-                    status = TaskStatus.valueOf(enhancedTask.status),
-                    isRecurring = enhancedTask.isRecurring,
-                    recurrencePattern = enhancedTask.recurrencePattern,
-                    recurrenceInterval = enhancedTask.recurrenceInterval,
-                    recurrenceEndDate = enhancedTask.recurrenceEndDate
-                )
+                userData?.let { userData ->
+                    useCases.insertTaskUseCase(
+                        userData = userData,
+                        title = enhancedTask.title,
+                        description = enhancedTask.description ?: "",
+                        taskType = enhancedTask.taskType,
+                        deadlineDate = enhancedTask.deadlineDate ?: "",
+                        deadlineTime = enhancedTask.deadlineTime ?: "",
+                        status = TaskStatus.valueOf(enhancedTask.status),
+                        isRecurring = enhancedTask.isRecurring,
+                        recurrencePattern = enhancedTask.recurrencePattern,
+                        recurrenceInterval = enhancedTask.recurrenceInterval,
+                        recurrenceEndDate = enhancedTask.recurrenceEndDate
+                    )
+                }
                 
                 // Schedule notifications if needed
-                onTaskCreated(enhancedTask)
-                
-                // Reload tasks
-                userData?.let { getTasks(it) }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error adding task with AI: ${e.message}", e)
-                
-                // Fallback to basic task addition without AI enhancements
-                try {
-                    useCases.insertTaskUseCase(
-                        userData = userData ?: throw IllegalStateException("User data is null"),
-                        title = task.title,
-                        description = task.description ?: "",
-                        taskType = task.taskType,
-                        deadlineDate = task.deadlineDate ?: "",
-                        deadlineTime = task.deadlineTime ?: "",
-                        status = TaskStatus.valueOf(task.status),
-                        isRecurring = task.isRecurring,
-                        recurrencePattern = task.recurrencePattern,
-                        recurrenceInterval = task.recurrenceInterval,
-                        recurrenceEndDate = task.recurrenceEndDate
-                    )
-                    
-                    onTaskCreated(task)
-                    userData?.let { getTasks(it) }
-                } finally {
-                    _state.update { it.copy(loading = false) }
+                if (enhancedTask.status == "PENDING" && enhancedTask.deadlineDate != null && enhancedTask.deadlineTime != null) {
+                    try {
+                        notificationScheduler.createNotificationsForTask(enhancedTask)
+                        Log.d(TAG, "Notification scheduled for task: ${enhancedTask.title}")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to schedule notification: ${e.message}", e)
+                    }
                 }
-            } finally {
+                
+                _state.update { it.copy(loading = false) }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error adding task: ${e.message}", e)
                 _state.update { it.copy(loading = false) }
             }
         }

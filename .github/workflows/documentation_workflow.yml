@@ -23,11 +23,28 @@ jobs:
 
       - name: Decode google-services.json
         env:
+          GOOGLE_SERVICES_BASE64: ${{ secrets.GOOGLE_SERVICES_BASE64 }}
           GOOGLE_SERVICES: ${{ secrets.GOOGLE_SERVICES }}
         run: |
-          echo "$GOOGLE_SERVICES" | base64 --decode > app/google-services.json
-          cat app/google-services.json | jq '.'
+          # Try Base64 encoded secret first (recommended approach)
+          if [ ! -z "$GOOGLE_SERVICES_BASE64" ]; then
+            echo "$GOOGLE_SERVICES_BASE64" | base64 --decode > app/google-services.json
+            echo "Using base64 encoded Google Services file"
+          # Fall back to direct JSON secret if available
+          elif [ ! -z "$GOOGLE_SERVICES" ]; then
+            echo "$GOOGLE_SERVICES" > app/google-services.json
+            echo "Using direct JSON Google Services file"
+          else
+            # Create a minimal placeholder if no secret available
+            echo '{"project_info":{"project_id":"dummy-project-id"}}' > app/google-services.json
+            echo "WARNING: Using minimal placeholder google-services.json."
+          fi
           
+          # Validate the JSON file
+          if ! jq empty app/google-services.json; then
+            echo "ERROR: Invalid google-services.json file - not valid JSON!"
+            exit 1
+          fi
 
       - name: Create local.properties
         run: |

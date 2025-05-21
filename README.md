@@ -1,3 +1,8 @@
+## Clé API Gemini (requise pour les fonctionnalités d'IA)
+
+* Obtenez votre clé sur [Google AI Studio](https://aistudio.google.com/)
+* Ajoutez dans `local.properties` à la racine :
+
 <div style="text-align: center;">
     <img src="https://github.com/user-attachments/assets/78d45699-5c63-4499-bf81-08311df8604f" alt="logoTASKY" width="200" />
 </div>
@@ -6,19 +11,59 @@
 
 # **Table des matières**
 - [Pour commencer](#pour-commencer)
+- [Fonctionnalités](#fonctionnalités)
 - [Assurance qualité](#assurance-qualité)
 - [Documentation](#documentation)
 - [Rapport de couverture](#coverage-report)
-- [Démonstration](#demo)
 - [Comment installer le projet?](#project-installation)
 - [Comment configurer le projet?](#project-configuration)
 - [Comment exécuter le projet?](#project-execution)
+- [Fonctionnalités Avancées](PRIORITY_FEATURES.md)
+- [Guide de configuration GitHub Actions](GITHUB_ACTIONS_SETUP.md)
 
 # Pour commencer <a id="pour-commencer"></a>
 
 1. Téléchargez le fichier tasky-apk depuis les artefacts de l'action [Build and Deploy APK](https://github.com/elannasinada/tasky-mobile-app/actions/workflows/build_and_deploy_workflow.yml).
 2. Installez l'APK sur votre appareil Android.
 3. Utilisez l'application pour planifier vos tâches. =)
+
+# Fonctionnalités <a id="fonctionnalités"></a>
+
+## Gestion de tâches
+
+Tasky vous permet de créer, modifier et suivre vos tâches quotidiennes avec une interface intuitive.
+
+## Priorisation des tâches avec IA
+
+L'application intègre un système intelligent de priorisation des tâches :
+
+- **Suggestions automatiques** : L'IA analyse le contenu de vos tâches (titre, description,
+  échéance) et suggère automatiquement une priorité (Basse, Moyenne, Haute).
+- **Contrôle manuel** : Vous pouvez à tout moment remplacer la suggestion de l'IA par votre propre
+  choix de priorité.
+- **Persistance des priorités** : Une fois qu'une priorité est définie manuellement, elle est
+  conservée même après modification de la tâche.
+
+Voir [documentation détaillée des priorités](PRIORITY_FEATURES.md) pour plus d'informations sur
+cette fonctionnalité.
+
+## Tâches récurrentes
+
+Configurez des tâches qui se répètent selon un calendrier défini (quotidien, hebdomadaire, mensuel
+ou annuel).
+
+## Notifications
+
+Recevez des rappels pour vos tâches à venir afin de ne jamais manquer une échéance importante.
+
+## Intégration Google Calendar
+
+Synchronisez vos tâches avec Google Calendar pour une gestion optimale de votre emploi du temps :
+
+- **Synchronisation bidirectionnelle** : Les tâches créées dans Tasky apparaissent dans votre Google
+  Calendar et vice versa.
+- **Rappels unifiés** : Recevez des notifications cohérentes sur tous vos appareils.
+- **Gestion simplifiée** : Modifiez vos tâches depuis n'importe quelle interface.
 
 # Assurance qualité <a id="assurance-qualité"></a>
 
@@ -36,11 +81,6 @@ La documentation est automatiquement générée et publiée à chaque push sur l
 ## Rapport de couverture <a id="coverage-report"></a>
 
 Un rapport de couverture des tests unitaires est généré et publié à chaque push sur la branche principale. Pour accéder au rapport de couverture des tests, téléchargez le fichier *Tasky-Coverage-Report* depuis les artefacts de l'action [Coverage Report](https://github.com/elannasinada/tasky-mobile-app/actions/workflows/coverage_report_worflow.yml).
-
-# Démonstration <a id="demo"></a>
-
-Vous pouvez regarder une démo des fonctionnalités de l'application sur cette vidéo YouTube.
-
 
 # Installation du projet <a id="project-installation"></a>
 
@@ -60,6 +100,9 @@ cd tasky-mobile-app
 
 2. Ouvrez le projet dans Android Studio (`File > Open`)
 3. Synchronisez avec Gradle (`Tools > Android > Sync Project with Gradle Files`)
+
+> **Note**: Pour configurer les intégrations GitHub Actions, consultez
+> notre [Guide de configuration des GitHub Actions](GITHUB_ACTIONS_SETUP.md).
 
 # Configuration du projet <a id="project-configuration"></a>
 
@@ -115,19 +158,10 @@ firebase deploy --only functions
    * Application Web (pour les Cloud Functions)
 3. Ajoutez l'ID client Web dans `res/values/strings.xml` :
 
-```xml
-<string name="default_web_client_id">VOTRE_WEB_CLIENT_ID</string>
-```
-
-## Clé API Gemini (optionnelle)
-* Obtenez votre clé sur Google AI Studio
-* Ajoutez dans `local.properties` à la racine :
-
 ```properties
 gemini.api.key=VOTRE_CLE_API_GEMINI
 ```
 
-# Exécution du projet <a id="project-execution"></a>
 
 ## Préparation
 * Lancez un émulateur ou connectez un appareil physique compatible

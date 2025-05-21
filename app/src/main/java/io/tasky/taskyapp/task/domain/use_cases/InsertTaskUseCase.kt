@@ -26,6 +26,8 @@ class InsertTaskUseCase(
      * @param recurrencePattern Recurrence pattern.
      * @param recurrenceInterval Recurrence interval.
      * @param recurrenceEndDate Recurrence end date.
+     * @param priority The priority of the task, manually set by the user.
+     * @param isPriorityManuallySet Whether the priority was manually set by the user.
      */
     suspend operator fun invoke(
         userData: UserData,
@@ -38,7 +40,9 @@ class InsertTaskUseCase(
         isRecurring: Boolean = false,
         recurrencePattern: String? = null,
         recurrenceInterval: Int = 1,
-        recurrenceEndDate: String? = null
+        recurrenceEndDate: String? = null,
+        priority: Int = 0,
+        isPriorityManuallySet: Boolean = false
     ) {
         if (title.isBlank())
             throw Exception("You can't save without a title")
@@ -57,14 +61,20 @@ class InsertTaskUseCase(
             isRecurring = isRecurring,
             recurrencePattern = recurrencePattern,
             recurrenceInterval = recurrenceInterval,
-            recurrenceEndDate = recurrenceEndDate
+            recurrenceEndDate = recurrenceEndDate,
+            priority = priority,
+            isPriorityManuallySet = isPriorityManuallySet
         )
         
-        // Predict priority if predictor is available
-        val taskWithPriority = geminiPriorityUseCase?.let { predictor ->
-            val priority = predictor.invoke(task)
-            task.copy(priority = priority)
-        } ?: task
+        // Only predict priority if it wasn't manually set
+        val taskWithPriority = if (!task.isPriorityManuallySet) {
+            geminiPriorityUseCase?.let { predictor ->
+                val predictedPriority = predictor.invoke(task)
+                task.copy(priority = predictedPriority)
+            } ?: task
+        } else {
+            task
+        }
         
         // Insert the task with priority
         repository.insertTask(

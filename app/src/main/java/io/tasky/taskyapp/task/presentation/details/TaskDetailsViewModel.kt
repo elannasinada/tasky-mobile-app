@@ -62,13 +62,17 @@ class TaskDetailsViewModel @Inject constructor(
                             taskType = _state.value.task?.taskType ?: "PERSONAL",
                             deadlineDate = event.date,
                             deadlineTime = event.time,
-                            status = event.status
+                            status = event.status,
+                            priority = event.priority,
+                            isPriorityManuallySet = event.priority > 0 // True when priority is Medium (1) or High (2)
                         )
-                        val suggestedPriority = geminiService.suggestTaskPriority(task)
-                        _state.value = _state.value.copy(suggestedPriority = suggestedPriority)
                         
-                        // Use suggested priority if user hasn't set one
-                        val finalPriority = if (event.priority == 0) suggestedPriority else event.priority
+                        // Only get AI suggestion if user hasn't manually set priority
+                        if (!task.isPriorityManuallySet) {
+                            val suggestedPriority = geminiService.suggestTaskPriority(task)
+                            _state.value = _state.value.copy(suggestedPriority = suggestedPriority)
+                            task.priority = suggestedPriority
+                        }
                         
                         insertTask(
                             title = event.title,
@@ -76,7 +80,7 @@ class TaskDetailsViewModel @Inject constructor(
                             date = event.date,
                             time = event.time,
                             status = event.status,
-                            priority = finalPriority,
+                            priority = task.priority,
                             isRecurring = event.isRecurring,
                             recurrencePattern = event.recurrencePattern,
                             recurrenceInterval = event.recurrenceInterval,
@@ -111,13 +115,17 @@ class TaskDetailsViewModel @Inject constructor(
                             taskType = _state.value.task?.taskType ?: "PERSONAL",
                             deadlineDate = event.date,
                             deadlineTime = event.time,
-                            status = event.status
+                            status = event.status,
+                            priority = event.priority,
+                            isPriorityManuallySet = event.priority > 0 // True when priority is Medium (1) or High (2)
                         )
-                        val suggestedPriority = geminiService.suggestTaskPriority(task)
-                        _state.value = _state.value.copy(suggestedPriority = suggestedPriority)
                         
-                        // Use suggested priority if user hasn't set one
-                        val finalPriority = if (event.priority == 0) suggestedPriority else event.priority
+                        // Only get AI suggestion if user hasn't manually set priority
+                        if (!task.isPriorityManuallySet) {
+                            val suggestedPriority = geminiService.suggestTaskPriority(task)
+                            _state.value = _state.value.copy(suggestedPriority = suggestedPriority)
+                            task.priority = suggestedPriority
+                        }
                         
                         updateTask(
                             title = event.title,
@@ -125,7 +133,7 @@ class TaskDetailsViewModel @Inject constructor(
                             date = event.date,
                             time = event.time,
                             status = event.status,
-                            priority = finalPriority,
+                            priority = task.priority,
                             isRecurring = event.isRecurring,
                             recurrencePattern = event.recurrencePattern,
                             recurrenceInterval = event.recurrenceInterval,
@@ -152,14 +160,24 @@ class TaskDetailsViewModel @Inject constructor(
             is TaskDetailsEvent.SetTaskData -> {
                 Log.d(TAG, "SetTaskData received: ${event.task}")
                 if (event.task.taskType.isBlank()) {
-                    _state.value = _state.value.copy(task = event.task.copy(taskType = "PERSONAL"))
+                    _state.value = _state.value.copy(
+                        task = event.task.copy(taskType = "PERSONAL"), 
+                        isPriorityManuallySet = event.task.isPriorityManuallySet
+                    )
                     Log.d(TAG, "Set default task type to PERSONAL")
                 } else {
-                    _state.value = _state.value.copy(task = event.task)
+                    _state.value = _state.value.copy(
+                        task = event.task,
+                        isPriorityManuallySet = event.task.isPriorityManuallySet
+                    )
                 }
                 
-                // Get AI priority suggestion when task is loaded
-                getSuggestedPriority(event.task)
+                // Get AI priority suggestion only if task doesn't have a manual priority
+                if (!event.task.isPriorityManuallySet) {
+                    getSuggestedPriority(event.task)
+                } else {
+                    Log.d(TAG, "Using manually set priority: ${event.task.priority}")
+                }
             }
         }
     }
@@ -197,6 +215,7 @@ class TaskDetailsViewModel @Inject constructor(
                     deadlineTime = time,
                     status = status,
                     priority = priority,
+                    isPriorityManuallySet = priority > 0, // Consider it manually set if not Low priority
                     isRecurring = isRecurring,
                     recurrencePattern = recurrencePattern,
                     recurrenceInterval = recurrenceInterval,
@@ -267,7 +286,8 @@ class TaskDetailsViewModel @Inject constructor(
                     recurrencePattern = if (isRecurring) recurrencePattern else null,
                     recurrenceInterval = if (isRecurring) recurrenceInterval else 1,
                     recurrenceEndDate = if (isRecurring && !recurrenceEndDate.isNullOrBlank()) recurrenceEndDate else null,
-                    priority = priority
+                    priority = priority,
+                    isPriorityManuallySet = task.isPriorityManuallySet || priority > 0 // Preserve manual setting or mark as manual if Medium/High
                 )
 
                 useCases.updateTaskUseCase(

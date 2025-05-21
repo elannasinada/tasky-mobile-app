@@ -234,6 +234,7 @@ fun TaskDetailsScreen(
             PrioritySelector(
                 currentPriority = priority.value,
                 suggestedPriority = state.suggestedPriority,
+                isPriorityManuallySet = state.task?.isPriorityManuallySet ?: false,
                 onPrioritySelected = { newPriority -> 
                     priority.value = newPriority 
                 },
@@ -571,6 +572,7 @@ private fun getIntervalText(pattern: String?, interval: Int): String {
 fun PrioritySelector(
     currentPriority: Int,
     suggestedPriority: Int?,
+    isPriorityManuallySet: Boolean,
     onPrioritySelected: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -586,67 +588,119 @@ fun PrioritySelector(
                 .padding(16.dp),
             horizontalAlignment = Alignment.Start
         ) {
-            // AI Suggested Priority (if available)
-            suggestedPriority?.let { suggested ->
+            // AI Suggested Priority (if available and not manually set)
+            if (suggestedPriority != null && !isPriorityManuallySet) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 8.dp)
                 ) {
-                    Text(
-                        text = "AI Suggested:",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    
-                    Spacer(modifier = Modifier.width(8.dp))
-                    
-                    val priorityText = when(suggested) {
-                        0 -> "Low"
-                        1 -> "Medium"
-                        else -> "High"
-                    }
-                    
-                    Box(
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .background(
-                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                                shape = RoundedCornerShape(16.dp)
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                shape = RoundedCornerShape(8.dp)
                             )
-                            .padding(1.dp)
+                            .padding(8.dp)
+                            .fillMaxWidth()
                     ) {
-                        Card(
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        Icon(
+                            imageVector = Icons.Filled.PriorityHigh,
+                            contentDescription = "AI Priority",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        
+                        Spacer(modifier = Modifier.width(8.dp))
+                        
+                        Column {
+                            Text(
+                                text = "AI priority applied: ${when(suggestedPriority) {
+                                    0 -> "Low"
+                                    1 -> "Medium"
+                                    else -> "High"
+                                }}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.PriorityHigh,
-                                    contentDescription = "Priority",
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = priorityText,
-                                    style = MaterialTheme.typography.labelMedium
-                                )
-                            }
+                            
+                            Text(
+                                text = "You can override it manually using the buttons below",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+                }
+            }
+            
+            // Show manual priority notice
+            if (isPriorityManuallySet) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .background(
+                                color = Color(0xFFEADDFF), // Light purple background
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .padding(8.dp)
+                            .fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.PriorityHigh,
+                            contentDescription = "Manual Priority",
+                            tint = Color(0xFF6750A4), // Purple accent
+                            modifier = Modifier.size(20.dp)
+                        )
+                        
+                        Spacer(modifier = Modifier.width(8.dp))
+                        
+                        Column {
+                            Text(
+                                text = "Manual priority selected",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color(0xFF6750A4) // Purple accent
+                            )
+                            
+                            Text(
+                                text = "Your manual selection will override AI suggestions",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF6750A4).copy(alpha = 0.7f)
+                            )
                         }
                     }
                 }
             }
             
             // Priority Selection
-            Text(
-                text = "Select Priority:",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(bottom = 8.dp, top = if (suggestedPriority == null) 0.dp else 8.dp)
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp, top = if (suggestedPriority == null && !isPriorityManuallySet) 0.dp else 12.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.PriorityHigh,
+                    contentDescription = "Priority",
+                    modifier = Modifier.size(20.dp)
+                )
+                
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                Text(
+                    text = "Select Priority Manually:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                )
+            }
             
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -677,6 +731,18 @@ fun PrioritySelector(
                     color = Color(0xFFA9DFFF), // Blue for low priority
                     onClick = { onPrioritySelected(0) },
                     modifier = Modifier.weight(1f)
+                )
+            }
+            
+            // Small note explaining priority persistence
+            if (currentPriority > 0 && !isPriorityManuallySet) { // Only show for medium/high priorities that aren't already marked as manual
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Your manual priority selection will be saved permanently",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
                 )
             }
         }

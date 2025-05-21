@@ -58,15 +58,21 @@ class UpdateTaskUseCase(
             isRecurring = isRecurring,
             recurrencePattern = recurrencePattern,
             recurrenceInterval = recurrenceInterval,
-            recurrenceEndDate = recurrenceEndDate
+            recurrenceEndDate = recurrenceEndDate,
+            priority = task.priority,
+            isPriorityManuallySet = task.isPriorityManuallySet
         )
 
-        // Predict priority if predictor is available
-        val taskWithPriority = geminiPriorityUseCase?.let { predictor ->
-            val priority = predictor.invoke(updatedTask)
-            updatedTask.copy(priority = priority)
-        } ?: updatedTask
-        
+        // Only predict priority if it wasn't manually set
+        val taskWithPriority = if (!updatedTask.isPriorityManuallySet) {
+            geminiPriorityUseCase?.let { predictor ->
+                val priority = predictor.invoke(updatedTask)
+                updatedTask.copy(priority = priority)
+            } ?: updatedTask
+        } else {
+            updatedTask
+        }
+
         repository.insertTask(
             userData = userData,
             task = taskWithPriority
