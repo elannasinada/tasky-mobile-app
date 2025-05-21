@@ -4,7 +4,7 @@ import io.tasky.taskyapp.task.domain.model.Task
 
 data class TaskDetailsState(
     var task: Task? = null,
-    var status: String? = null, // Added status field to track task status
-    var suggestedPriority: Int? = null, // AI suggested priority
-    var isPriorityManuallySet: Boolean = false // Track if user manually set the priority
+    var status: String? = null,
+    var suggestedPriority: Int? = null,
+    var isPriorityManuallySet: Boolean = false
 )

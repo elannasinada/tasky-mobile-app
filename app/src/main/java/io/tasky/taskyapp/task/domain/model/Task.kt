@@ -4,7 +4,7 @@ import com.google.gson.Gson
 import java.util.UUID
 
 /**
- * Data from a single task.
+ * Represents a task with its properties and state
  */
 data class Task(
     val uuid: String = UUID.randomUUID().toString(),
@@ -18,12 +18,18 @@ data class Task(
     var recurrencePattern: String? = null, 
     var recurrenceInterval: Int = 1, 
     var recurrenceEndDate: String? = null,
-    var priority: Int = 0, // 0 = Low, 1 = Medium, 2 = High
-    var isPriorityManuallySet: Boolean = false // Track if priority was manually set by user
+    var priority: Int = 0,
+    var isPriorityManuallySet: Boolean = false
 ) {
     companion object {
+        /**
+         * Creates a Task object from its JSON representation
+         */
         fun fromJson(json: String): Task = Gson().fromJson(json, Task::class.java)
 
+        /**
+         * Creates a Task from a database snapshot HashMap
+         */
         fun fromSnapshot(hashMap: HashMap<String, Any?>): Task {
             return Task(
                 uuid = hashMap["uuid"]?.toString() ?: "",
@@ -51,6 +57,9 @@ data class Task(
         }
     }
 
+    /**
+     * Converts task to JSON string
+     */
     fun toJson() = Gson().toJson(this).toString()
 
     /**

@@ -6,28 +6,16 @@ import io.tasky.taskyapp.task.domain.model.TaskStatus
 import io.tasky.taskyapp.task.domain.repository.TaskRepository
 
 /**
- * Created a new task.
+ * Use case for creating a new task
  */
 class InsertTaskUseCase(
     private val repository: TaskRepository,
     private val geminiPriorityUseCase: GeminiPriorityUseCase? = null
 ) {
     /**
-     * Created a new task.
-     *
-     * @param userData Data from the user to assign the task.
-     * @param title Task title.
-     * @param description Task description.
-     * @param taskType Task type.
-     * @param deadlineDate Deadline date.
-     * @param deadlineTime Deadline time.
-     * @param status Task status.
-     * @param isRecurring Whether the task is recurring.
-     * @param recurrencePattern Recurrence pattern.
-     * @param recurrenceInterval Recurrence interval.
-     * @param recurrenceEndDate Recurrence end date.
-     * @param priority The priority of the task, manually set by the user.
-     * @param isPriorityManuallySet Whether the priority was manually set by the user.
+     * Creates a new task with validation and optional AI priority suggestions
+     * 
+     * @throws Exception if title is blank or taskType is blank
      */
     suspend operator fun invoke(
         userData: UserData,

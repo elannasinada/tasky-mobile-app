@@ -64,7 +64,6 @@ class CalendarViewModel @Inject constructor(
     fun handleSignInResult(data: Intent?) {
         viewModelScope.launch {
             try {
-                // Clear loading and sign-in prompt state immediately
                 state = state.copy(
                     isLoading = false,
                     showGoogleSignInPrompt = false
@@ -75,16 +74,13 @@ class CalendarViewModel @Inject constructor(
                 if (account != null) {
                     _eventFlow.emitSafe(UiEvent.ShowToast("Connected to Google Calendar successfully"))
                     
-                    // Silently refresh calendar data
                     refreshCalendarAndTasks(emptyList(), showToasts = false)
                 } else {
                     state = state.copy(showGoogleSignInPrompt = true)
                 }
             } catch (e: Exception) {
                 if (e is ApiException && e.statusCode == 12501) {
-                    // Error 12501 is "user canceled" - try to recover by using any available account
-                    
-                    // Try to use last signed-in account
+
                     val lastAccount = GoogleSignIn.getLastSignedInAccount(context)
                     if (lastAccount != null) {
                         refreshCalendarAndTasks(emptyList(), showToasts = false)
@@ -95,7 +91,7 @@ class CalendarViewModel @Inject constructor(
                         )
                     }
                 } else {
-                    // Other error
+
                     state = state.copy(error = "Error: ${e.message}")
                     _eventFlow.emitSafe(UiEvent.ShowToast("Failed to sign in with Google"))
                 }
@@ -108,10 +104,10 @@ class CalendarViewModel @Inject constructor(
             try {
                 state = state.copy(isSyncing = true)
 
-                // Get the GoogleSignInAccount
+
                 val account = GoogleSignIn.getLastSignedInAccount(context)
 
-                // Check if user has Google account and calendar permissions
+
                 if (account == null || !hasCalendarPermission(account)) {
                     _eventFlow.emit(UiEvent.NavigateToGoogleSignIn)
                     state = state.copy(isSyncing = false)
@@ -193,7 +189,7 @@ class CalendarViewModel @Inject constructor(
                             }
                             _eventFlow.emitSafe(UiEvent.ShowToast(message))
 
-                            // After syncing tasks, refresh calendar events
+            
                             loadCalendarEvents(tasks)
                         }
                         is Resource.Error -> {
@@ -310,7 +306,7 @@ class CalendarViewModel @Inject constructor(
     fun loadCalendarEvents(tasks: List<Task> = emptyList()) {
         viewModelScope.launch {
             try {
-                // Always select today to start
+
                 val today = LocalDate.now()
                 state = state.copy(
                     isLoading = true,
@@ -320,7 +316,7 @@ class CalendarViewModel @Inject constructor(
                 // Get the GoogleSignInAccount - always try to use whatever account we have
                 val account = GoogleSignIn.getLastSignedInAccount(context)
                 if (account == null) {
-                    // No account found, show sign-in prompt
+
                     state = state.copy(
                         isLoading = false,
                         showGoogleSignInPrompt = true
@@ -462,12 +458,12 @@ class CalendarViewModel @Inject constructor(
                                 val processedTaskIds = mutableSetOf<String>()
                                 val finalItems = mutableListOf<CalendarItem>()
                                 
-                                // First add all Google Calendar events
+                
                                 result.data?.filterIsInstance<CalendarItem.GoogleEventItem>()?.let {
                                     finalItems.addAll(it)
                                 }
                                 
-                                // Then add tasks from the repository result, tracking IDs
+                
                                 result.data?.filterIsInstance<CalendarItem.TaskItem>()?.forEach { taskItem ->
                                     if (!processedTaskIds.contains(taskItem.task.uuid)) {
                                         finalItems.add(taskItem)
@@ -475,7 +471,7 @@ class CalendarViewModel @Inject constructor(
                                     }
                                 }
                                 
-                                // Finally add any tasks with matching date strings that weren't already added
+                
                                 tasksForSelectedDate.forEach { task ->
                                     if (!processedTaskIds.contains(task.uuid)) {
                                         finalItems.add(CalendarItem.TaskItem(task))
@@ -483,7 +479,7 @@ class CalendarViewModel @Inject constructor(
                                     }
                                 }
                                 
-                                // Sort and handle conflicts
+                
                                 val sortedItems = sortAndHandleConflicts(finalItems)
                                 
                                 state = state.copy(selectedDateItems = sortedItems)
@@ -492,7 +488,6 @@ class CalendarViewModel @Inject constructor(
                                 state = state.copy(error = result.message)
                             }
                             is Resource.Loading -> {
-                                // Can add loading indicator for selected date if needed
                             }
                         }
                     }
@@ -501,7 +496,7 @@ class CalendarViewModel @Inject constructor(
                     val processedTaskIds = mutableSetOf<String>()
                     val finalItems = mutableListOf<CalendarItem>()
                     
-                    // First add any items already in our cached data
+    
                     state.dateEvents.find { it.date == date }?.items?.forEach { item ->
                         if (item is CalendarItem.TaskItem) {
                             if (!processedTaskIds.contains(item.task.uuid)) {
@@ -514,7 +509,7 @@ class CalendarViewModel @Inject constructor(
                         }
                     }
                     
-                    // Then add any tasks with matching date strings that weren't already added
+    
                     tasksForSelectedDate.forEach { task ->
                         if (!processedTaskIds.contains(task.uuid)) {
                             finalItems.add(CalendarItem.TaskItem(task))
@@ -522,7 +517,7 @@ class CalendarViewModel @Inject constructor(
                         }
                     }
                     
-                    // Sort and handle conflicts
+    
                     val sortedItems = sortAndHandleConflicts(finalItems)
                     
                     state = state.copy(selectedDateItems = sortedItems)
@@ -581,7 +576,7 @@ class CalendarViewModel @Inject constructor(
     private fun requestCalendarPermission() {
         showToast("Preparing Google Sign-In...")
         
-        // First sign out any existing Google account to prevent using the same account
+
         signOutGoogle {
             // Request both read and write permissions to maximize chances of working
             try {
@@ -597,7 +592,7 @@ class CalendarViewModel @Inject constructor(
                 showToast("Opening Google Calendar permissions...")
                 _eventFlow.emitSafe(UiEvent.RequestGoogleSignIn(gso))
             } catch (e: Exception) {
-                // If we can't request specific scopes, try a simpler approach
+
                 try {
                     val basicGso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                         .requestEmail()
@@ -620,13 +615,13 @@ class CalendarViewModel @Inject constructor(
     private fun signOutGoogle(onComplete: () -> Unit) {
         viewModelScope.launch {
             try {
-                // Create a basic GSO just for signing out
+
                 val signOutGso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
                 val googleSignInClient = GoogleSignIn.getClient(context, signOutGso)
                 
-                // Sign out and then proceed with the callback
+
                 googleSignInClient.signOut().addOnCompleteListener {
-                    // Force clear the cached account
+
                     try {
                         googleSignInClient.revokeAccess().addOnCompleteListener {
                             onComplete()

@@ -37,7 +37,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -106,7 +105,6 @@ fun TaskDetailsScreen(
 
     val showStatusDropdown = remember { mutableStateOf(false) }
 
-    // Keep track of whether this task is recurring - this is the single source of truth
     val isRecurring = remember { 
         mutableStateOf(false) 
     }
@@ -148,7 +146,6 @@ fun TaskDetailsScreen(
                     navController.popBackStack()
                 }
                 is TaskDetailsViewModel.UiEvent.ShowToast -> {
-                    // Toast is handled in MainActivity
                 }
             }
         }
@@ -180,7 +177,6 @@ fun TaskDetailsScreen(
         PremiumDialog(
             onDismiss = { showPremiumDialog = false },
             onUpgrade = {
-                // You can trigger the upgrade flow here if needed
                 showPremiumDialog = false
             }
         )
@@ -230,7 +226,6 @@ fun TaskDetailsScreen(
 
             DateAndTimePickers(date, time)
 
-            // Priority selection
             PrioritySelector(
                 currentPriority = priority.value,
                 suggestedPriority = state.suggestedPriority,
@@ -243,7 +238,6 @@ fun TaskDetailsScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
-            // Status selector
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -293,7 +287,6 @@ fun TaskDetailsScreen(
                 }
             }
 
-            // Recurrence section
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -302,12 +295,10 @@ fun TaskDetailsScreen(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             ) {
-                // Make the entire card clickable to toggle recurring status
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
-                            // Simply toggle our single source of truth
                             isRecurring.value = !isRecurring.value
                         }
                         .padding(16.dp)
@@ -322,7 +313,6 @@ fun TaskDetailsScreen(
                             modifier = Modifier.weight(1f)
                         )
                         
-                        // Create a custom toggle indicator with ON/OFF text
                         Card(
                             shape = RectangleShape,
                             colors = CardDefaults.cardColors(
@@ -345,7 +335,6 @@ fun TaskDetailsScreen(
                         }
                     }
                     
-                    // Add an explanatory text that adapts to the current state
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = if (isRecurring.value) 
@@ -358,7 +347,6 @@ fun TaskDetailsScreen(
                 }
             }
             
-            // Recurrence options - only show if recurring is checked
             if (isRecurring.value) {
                 Card(
                     modifier = Modifier
@@ -373,7 +361,6 @@ fun TaskDetailsScreen(
                             .fillMaxWidth()
                             .padding(16.dp)
                     ) {
-                        // Recurrence pattern dropdown
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
@@ -408,7 +395,6 @@ fun TaskDetailsScreen(
                             }
                         }
 
-                        // Interval
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Text(text = "Every ${recurrenceInterval.value} ${getIntervalText(recurrencePattern.value, recurrenceInterval.value)}")
@@ -420,7 +406,6 @@ fun TaskDetailsScreen(
                             steps = 29
                         )
 
-                        // End date
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Text(text = "End date (optional):")
@@ -499,7 +484,6 @@ private fun DateAndTimePickers(
 ) {
     val context = LocalContext.current
     
-    // Set default values for date and time if empty
     if (date.value.isEmpty()) {
         val dateFormat = SimpleDateFormat("yyyy/MM/dd", Locale.getDefault())
         date.value = dateFormat.format(Date())
@@ -556,7 +540,6 @@ private fun DateAndTimePickers(
     }
 }
 
-// Helper function to provide the appropriate interval text
 private fun getIntervalText(pattern: String?, interval: Int): String {
     if (pattern == null) return ""
     return when (pattern) {
@@ -588,7 +571,6 @@ fun PrioritySelector(
                 .padding(16.dp),
             horizontalAlignment = Alignment.Start
         ) {
-            // AI Suggested Priority (if available and not manually set)
             if (suggestedPriority != null && !isPriorityManuallySet) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -636,7 +618,6 @@ fun PrioritySelector(
                 }
             }
             
-            // Show manual priority notice
             if (isPriorityManuallySet) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -648,7 +629,7 @@ fun PrioritySelector(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .background(
-                                color = Color(0xFFEADDFF), // Light purple background
+                                color = Color(0xFFEADDFF),
                                 shape = RoundedCornerShape(8.dp)
                             )
                             .padding(8.dp)
@@ -657,7 +638,7 @@ fun PrioritySelector(
                         Icon(
                             imageVector = Icons.Filled.PriorityHigh,
                             contentDescription = "Manual Priority",
-                            tint = Color(0xFF6750A4), // Purple accent
+                            tint = Color(0xFF6750A4),
                             modifier = Modifier.size(20.dp)
                         )
                         
@@ -667,7 +648,7 @@ fun PrioritySelector(
                             Text(
                                 text = "Manual priority selected",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = Color(0xFF6750A4) // Purple accent
+                                color = Color(0xFF6750A4)
                             )
                             
                             Text(
@@ -680,7 +661,6 @@ fun PrioritySelector(
                 }
             }
             
-            // Priority Selection
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -706,36 +686,32 @@ fun PrioritySelector(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // High Priority Button
                 PriorityButton(
                     text = "High",
                     isSelected = currentPriority == 2,
-                    color = Color(0xFFFFB4AB), // Red for high priority
+                    color = Color(0xFFFFB4AB),
                     onClick = { onPrioritySelected(2) },
                     modifier = Modifier.weight(1f)
                 )
                 
-                // Medium Priority Button
                 PriorityButton(
                     text = "Medium",
                     isSelected = currentPriority == 1,
-                    color = Color(0xFFFFD8A9), // Orange/amber for medium priority
+                    color = Color(0xFFFFD8A9),
                     onClick = { onPrioritySelected(1) },
                     modifier = Modifier.weight(1f)
                 )
                 
-                // Low Priority Button
                 PriorityButton(
                     text = "Low",
                     isSelected = currentPriority == 0,
-                    color = Color(0xFFA9DFFF), // Blue for low priority
+                    color = Color(0xFFA9DFFF),
                     onClick = { onPrioritySelected(0) },
                     modifier = Modifier.weight(1f)
                 )
             }
             
-            // Small note explaining priority persistence
-            if (currentPriority > 0 && !isPriorityManuallySet) { // Only show for medium/high priorities that aren't already marked as manual
+            if (currentPriority > 0 && !isPriorityManuallySet) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "Your manual priority selection will be saved permanently",

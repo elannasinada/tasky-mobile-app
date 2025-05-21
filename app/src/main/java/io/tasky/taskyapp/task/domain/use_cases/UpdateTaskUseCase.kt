@@ -5,7 +5,7 @@ import io.tasky.taskyapp.task.domain.model.Task
 import io.tasky.taskyapp.task.domain.repository.TaskRepository
 
 /**
- * Updates an existent task.
+ * Use case for updating an existing task.
  */
 class UpdateTaskUseCase(
     private val repository: TaskRepository,
@@ -47,7 +47,6 @@ class UpdateTaskUseCase(
         if (taskType.isBlank())
             throw Exception("You can't save without a task type")
 
-        // Create the updated task
         val updatedTask = task.copy(
             title = title,
             description = description,
@@ -63,7 +62,6 @@ class UpdateTaskUseCase(
             isPriorityManuallySet = task.isPriorityManuallySet
         )
 
-        // Only predict priority if it wasn't manually set
         val taskWithPriority = if (!updatedTask.isPriorityManuallySet) {
             geminiPriorityUseCase?.let { predictor ->
                 val priority = predictor.invoke(updatedTask)

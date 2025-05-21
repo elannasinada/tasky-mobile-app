@@ -23,6 +23,10 @@ import java.util.*
 import javax.inject.Inject
 import io.tasky.taskyapp.core.domain.PremiumManager
 
+/**
+ * ViewModel for managing task details screen.
+ * Handles task creation, updates, and AI priority suggestions.
+ */
 @HiltViewModel
 class TaskDetailsViewModel @Inject constructor(
     private val useCases: TaskUseCases,
@@ -53,7 +57,6 @@ class TaskDetailsViewModel @Inject constructor(
         when (event) {
             is TaskDetailsEvent.RequestInsert -> {
                 Log.d(TAG, "RequestInsert received with title: ${event.title}, date: ${event.date}, time: ${event.time}")
-                // Get AI suggestion before inserting
                 viewModelScope.launch {
                     try {
                         val task = Task(
@@ -64,10 +67,9 @@ class TaskDetailsViewModel @Inject constructor(
                             deadlineTime = event.time,
                             status = event.status,
                             priority = event.priority,
-                            isPriorityManuallySet = event.priority > 0 // True when priority is Medium (1) or High (2)
+                            isPriorityManuallySet = event.priority != 0
                         )
                         
-                        // Only get AI suggestion if user hasn't manually set priority
                         if (!task.isPriorityManuallySet) {
                             val suggestedPriority = geminiService.suggestTaskPriority(task)
                             _state.value = _state.value.copy(suggestedPriority = suggestedPriority)
@@ -88,7 +90,6 @@ class TaskDetailsViewModel @Inject constructor(
                         )
                     } catch (e: Exception) {
                         Log.e(TAG, "Error getting AI suggestion: ${e.message}", e)
-                        // Proceed with original priority if AI fails
                         insertTask(
                             title = event.title,
                             description = event.description,
@@ -106,7 +107,6 @@ class TaskDetailsViewModel @Inject constructor(
             }
             is TaskDetailsEvent.RequestUpdate -> {
                 Log.d(TAG, "RequestUpdate received with title: ${event.title}, date: ${event.date}, time: ${event.time}")
-                // Get AI suggestion before updating
                 viewModelScope.launch {
                     try {
                         val task = Task(
@@ -117,10 +117,9 @@ class TaskDetailsViewModel @Inject constructor(
                             deadlineTime = event.time,
                             status = event.status,
                             priority = event.priority,
-                            isPriorityManuallySet = event.priority > 0 // True when priority is Medium (1) or High (2)
+                            isPriorityManuallySet = event.priority != 0
                         )
                         
-                        // Only get AI suggestion if user hasn't manually set priority
                         if (!task.isPriorityManuallySet) {
                             val suggestedPriority = geminiService.suggestTaskPriority(task)
                             _state.value = _state.value.copy(suggestedPriority = suggestedPriority)
@@ -141,7 +140,6 @@ class TaskDetailsViewModel @Inject constructor(
                         )
                     } catch (e: Exception) {
                         Log.e(TAG, "Error getting AI suggestion: ${e.message}", e)
-                        // Proceed with original priority if AI fails
                         updateTask(
                             title = event.title,
                             description = event.description,
@@ -160,28 +158,22 @@ class TaskDetailsViewModel @Inject constructor(
             is TaskDetailsEvent.SetTaskData -> {
                 Log.d(TAG, "SetTaskData received: ${event.task}")
                 if (event.task.taskType.isBlank()) {
-                    _state.value = _state.value.copy(
-                        task = event.task.copy(taskType = "PERSONAL"), 
-                        isPriorityManuallySet = event.task.isPriorityManuallySet
-                    )
+                    _state.value = _state.value.copy(task = event.task.copy(taskType = "PERSONAL"))
                     Log.d(TAG, "Set default task type to PERSONAL")
                 } else {
-                    _state.value = _state.value.copy(
-                        task = event.task,
-                        isPriorityManuallySet = event.task.isPriorityManuallySet
-                    )
+                    _state.value = _state.value.copy(task = event.task)
                 }
                 
-                // Get AI priority suggestion only if task doesn't have a manual priority
                 if (!event.task.isPriorityManuallySet) {
                     getSuggestedPriority(event.task)
-                } else {
-                    Log.d(TAG, "Using manually set priority: ${event.task.priority}")
                 }
             }
         }
     }
 
+    /**
+     * Inserts a new task and schedules notifications if needed.
+     */
     private fun insertTask(
         title: String,
         description: String,
@@ -215,7 +207,6 @@ class TaskDetailsViewModel @Inject constructor(
                     deadlineTime = time,
                     status = status,
                     priority = priority,
-                    isPriorityManuallySet = priority > 0, // Consider it manually set if not Low priority
                     isRecurring = isRecurring,
                     recurrencePattern = recurrencePattern,
                     recurrenceInterval = recurrenceInterval,
@@ -253,6 +244,9 @@ class TaskDetailsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Updates an existing task and manages notifications.
+     */
     private fun updateTask(
         title: String,
         description: String,
@@ -286,8 +280,7 @@ class TaskDetailsViewModel @Inject constructor(
                     recurrencePattern = if (isRecurring) recurrencePattern else null,
                     recurrenceInterval = if (isRecurring) recurrenceInterval else 1,
                     recurrenceEndDate = if (isRecurring && !recurrenceEndDate.isNullOrBlank()) recurrenceEndDate else null,
-                    priority = priority,
-                    isPriorityManuallySet = task.isPriorityManuallySet || priority > 0 // Preserve manual setting or mark as manual if Medium/High
+                    priority = priority
                 )
 
                 useCases.updateTaskUseCase(
@@ -323,6 +316,9 @@ class TaskDetailsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Gets AI-suggested priority for a task.
+     */
     private fun getSuggestedPriority(task: Task) {
         viewModelScope.launch {
             try {
