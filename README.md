@@ -1,9 +1,46 @@
-# README - Tasky Mobile App
+<div style="text-align: center;">
+    <img src="https://github.com/user-attachments/assets/78d45699-5c63-4499-bf81-08311df8604f" alt="logoTASKY" width="200" />
+</div>
+
+# Tasky Mobile App
 
 # **Table des matières**
+- [Pour commencer](#pour-commencer)
+- [Assurance qualité](#assurance-qualité)
+- [Documentation](#documentation)
+- [Rapport de couverture](#coverage-report)
+- [Démonstration](#demo)
 - [Comment installer le projet?](#project-installation)
 - [Comment configurer le projet?](#project-configuration)
 - [Comment exécuter le projet?](#project-execution)
+
+# Pour commencer <a id="pour-commencer"></a>
+
+1. Téléchargez le fichier tasky-apk depuis les artefacts de l'action [Build and Deploy APK](https://github.com/elannasinada/tasky-mobile-app/actions/workflows/build_and_deploy_workflow.yml).
+2. Installez l'APK sur votre appareil Android.
+3. Utilisez l'application pour planifier vos tâches. =)
+
+# Assurance qualité <a id="assurance-qualité"></a>
+
+Pour garantir un code de haute qualité, les outils et processus suivants sont utilisés avant la fusion de toute pull request :
+
+* [Ktlint](https://pinterest.github.io/ktlint/latest/) est utilisé pour appliquer les règles de style de code.
+* Tous les tests unitaires sont exécutés pour assurer la fonctionnalité et la qualité du code.
+
+Ce processus aide à maintenir la cohérence et la qualité du code tout au long du projet.
+
+# Documentation <a id="documentation"></a>
+
+La documentation est automatiquement générée et publiée à chaque push sur la branche principale. Pour accéder à la documentation, téléchargez le fichier *Tasky-Documentation* depuis les artefacts de l'action [Documentation](https://github.com/elannasinada/tasky-mobile-app/actions/workflows/documentation_workflow.yml).
+
+## Rapport de couverture <a id="coverage-report"></a>
+
+Un rapport de couverture des tests unitaires est généré et publié à chaque push sur la branche principale. Pour accéder au rapport de couverture des tests, téléchargez le fichier *Tasky-Coverage-Report* depuis les artefacts de l'action [Coverage Report](https://github.com/elannasinada/tasky-mobile-app/actions/workflows/coverage_report_worflow.yml).
+
+# Démonstration <a id="demo"></a>
+
+Vous pouvez regarder une démo des fonctionnalités de l'application sur cette vidéo YouTube.
+
 
 # Installation du projet <a id="project-installation"></a>
 
