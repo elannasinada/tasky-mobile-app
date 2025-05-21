@@ -73,7 +73,7 @@ Ce processus aide à maintenir la cohérence et la qualité du code tout au long
 
 La documentation est automatiquement générée et publiée à chaque push sur la branche principale. Pour accéder à la documentation, téléchargez le fichier *Tasky-Documentation* depuis les artefacts de l'action [Documentation](https://github.com/elannasinada/tasky-mobile-app/actions/workflows/documentation_workflow.yml).
 
-## Rapport de couverture <a id="coverage-report"></a>
+# Rapport de couverture <a id="coverage-report"></a>
 
 Un rapport de couverture des tests unitaires est généré et publié à chaque push sur la branche principale. Pour accéder au rapport de couverture des tests, téléchargez le fichier *Tasky-Coverage-Report* depuis les artefacts de l'action [Coverage Report](https://github.com/elannasinada/tasky-mobile-app/actions/workflows/coverage_report_worflow.yml).
 
