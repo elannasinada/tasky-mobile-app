@@ -1,8 +1,3 @@
-## Clé API Gemini (requise pour les fonctionnalités d'IA)
-
-* Obtenez votre clé sur [Google AI Studio](https://aistudio.google.com/)
-* Ajoutez dans `local.properties` à la racine :
-
 <div style="text-align: center;">
     <img src="https://github.com/user-attachments/assets/78d45699-5c63-4499-bf81-08311df8604f" alt="logoTASKY" width="200" />
 </div>
@@ -157,6 +152,11 @@ firebase deploy --only functions
    * Application Android (package `io.tasky.taskyapp`, SHA-1 de certificat)
    * Application Web (pour les Cloud Functions)
 3. Ajoutez l'ID client Web dans `res/values/strings.xml` :
+
+## Clé API Gemini (requise pour les fonctionnalités d'IA)
+
+* Obtenez votre clé sur [Google AI Studio](https://aistudio.google.com/)
+* Ajoutez dans `local.properties` à la racine :
 
 ```properties
 gemini.api.key=VOTRE_CLE_API_GEMINI
