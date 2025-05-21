@@ -74,7 +74,7 @@ class PredictTaskPriorityUseCase @Inject constructor(
     private fun predictPriorityWithRules(task: Task, daysUntilDeadline: Int): Int {
         // Check for urgent keywords in title or description
         val text = "${task.title} ${task.description ?: ""}".lowercase()
-        val urgentKeywords = listOf("urgent", "asap", "immediately", "today", "critical")
+        val urgentKeywords = listOf("urgent", "asap", "immediately", "today", "critical", "projet urgent", "dépôt urgent", "immédiat", "critique", "aujourd'hui")
         val importantKeywords = listOf("important", "priority", "soon", "tomorrow")
 
         // Priority by keywords

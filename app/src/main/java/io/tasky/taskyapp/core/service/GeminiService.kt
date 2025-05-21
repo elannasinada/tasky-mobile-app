@@ -352,9 +352,13 @@ class GeminiService @Inject constructor(
             else -> 0.0 // Personal or other
         }
 
-        val urgentKeywords = listOf("urgent", "important", "critical", "asap", "deadline", "due", "emergency")
+        val urgentKeywords = listOf("urgent", "important", "critical", "asap", "deadline", "due", "emergency", "projet urgent", "dépôt urgent", "immédiat", "critique", "aujourd'hui")
         val title = task.title.lowercase()
         val description = task.description?.lowercase() ?: ""
+
+        if (title.contains("urgent", ignoreCase = true)) {
+            priorityScore += 2.0  // Higher score for "urgent"
+        }
 
         for (keyword in urgentKeywords) {
             if (title.contains(keyword)) {

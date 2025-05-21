@@ -90,7 +90,7 @@ class MLKitTaskAnalyzer {
      * Checks if text contains urgent keywords.
      */
     private fun containsUrgentKeywords(text: String): Boolean {
-        val urgentKeywords = listOf("urgent", "immédiat", "critique", "aujourd'hui", "asap", "emergency")
+        val urgentKeywords = listOf("urgent", "immédiat", "critique", "aujourd'hui", "asap", "emergency", "projet urgent", "dépôt urgent")
         return urgentKeywords.any { text.lowercase().contains(it.lowercase()) }
     }
       

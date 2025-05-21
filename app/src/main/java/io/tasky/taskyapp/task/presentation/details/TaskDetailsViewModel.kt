@@ -67,7 +67,7 @@ class TaskDetailsViewModel @Inject constructor(
                             deadlineTime = event.time,
                             status = event.status,
                             priority = event.priority,
-                            isPriorityManuallySet = event.priority != 0
+                            isPriorityManuallySet = true
                         )
                         
                         if (!task.isPriorityManuallySet) {
@@ -117,7 +117,7 @@ class TaskDetailsViewModel @Inject constructor(
                             deadlineTime = event.time,
                             status = event.status,
                             priority = event.priority,
-                            isPriorityManuallySet = event.priority != 0
+                            isPriorityManuallySet = true
                         )
                         
                         if (!task.isPriorityManuallySet) {
@@ -280,7 +280,8 @@ class TaskDetailsViewModel @Inject constructor(
                     recurrencePattern = if (isRecurring) recurrencePattern else null,
                     recurrenceInterval = if (isRecurring) recurrenceInterval else 1,
                     recurrenceEndDate = if (isRecurring && !recurrenceEndDate.isNullOrBlank()) recurrenceEndDate else null,
-                    priority = priority
+                    priority = priority,
+                    isPriorityManuallySet = true
                 )
 
                 useCases.updateTaskUseCase(
