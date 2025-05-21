@@ -1,6 +1,10 @@
 name: Run Unit Tests
 
-on: pull_request
+on:
+  pull_request:
+  push:
+    branches: [ main, develop ]
+  workflow_dispatch:  # Allows manual triggering
 
 jobs:
   run_unit_tests:
@@ -14,16 +18,70 @@ jobs:
           java-version: 17
           distribution: 'adopt'
 
+      - name: Install jq (for JSON validation)
+        run: sudo apt-get update && sudo apt-get install -y jq
+
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
       - name: Decode google-services.json
         env:
+          GOOGLE_SERVICES_BASE64: ${{ secrets.GOOGLE_SERVICES_BASE64 }}
           GOOGLE_SERVICES: ${{ secrets.GOOGLE_SERVICES }}
-        run: echo $GOOGLE_SERVICES > app/google-services.json
+        run: |
+          # Try Base64 encoded secret first (recommended approach)
+          if [ ! -z "$GOOGLE_SERVICES_BASE64" ]; then
+            echo "$GOOGLE_SERVICES_BASE64" | base64 --decode > app/google-services.json
+            echo "Using base64 encoded Google Services file"
+          # Fall back to direct JSON secret if available
+          elif [ ! -z "$GOOGLE_SERVICES" ]; then
+            echo "$GOOGLE_SERVICES" > app/google-services.json
+            echo "Using direct JSON Google Services file"
+          else
+            # Create a minimal placeholder if no secret available
+            echo '{"project_info":{"project_id":"dummy-project-id"}}' > app/google-services.json
+            echo "WARNING: Using minimal placeholder google-services.json."
+          fi
+
+      - name: Validate google-services.json
+        run: |
+          echo "Validating google-services.json file..."
+          if ! jq empty app/google-services.json; then
+            echo "ERROR: Invalid google-services.json file - not valid JSON!"
+            exit 1
+          fi
+          echo "google-services.json file is valid JSON"
+
+      - name: Create local.properties with Gemini API key
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'dummy-api-key' }}
+        run: |
+          echo "gemini.api.key=$GEMINI_API_KEY" > local.properties
 
       - name: Build Project
-        run: ./gradlew assemble
+        run: ./gradlew assemble --stacktrace
 
       - name: Run Tests
-        run: ./gradlew clean createDebugUnitTestCoverageReport --warning-mode all --info
+        run: ./gradlew test --stacktrace --warning-mode all
+
+      - name: Generate Coverage Report
+        if: always()  # Run even if tests fail
+        run: ./gradlew createDebugUnitTestCoverageReport --warning-mode all || true
+
+      - name: Test Report
+        uses: dorny/test-reporter@v1
+        if: success() || failure()
+        with:
+          name: Unit Test Results
+          path: '**/build/test-results/**/*.xml'
+          reporter: java-junit
+
+      - name: Upload Test Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            **/build/reports/tests/
+            **/build/test-results/
+            app/build/reports/coverage/
