@@ -161,7 +161,9 @@ firebase deploy --only functions
 ```properties
 gemini.api.key=VOTRE_CLE_API_GEMINI
 ```
+![image](https://github.com/user-attachments/assets/42ec6f87-c516-40a7-8e9d-3242288f3f5f)
 
+# Exécution du projet <a id="project-execution"></a>
 
 ## Préparation
 * Lancez un émulateur ou connectez un appareil physique compatible
