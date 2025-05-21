@@ -4,11 +4,64 @@ jacoco {
     toolVersion = "0.8.8"
 }
 
+tasks.withType(Test) {
+    jacoco.includeNoLocationClasses = true
+    jacoco.excludes = ['jdk.internal.*']
+}
+
+task jacocoTestReport(type: JacocoReport, dependsOn: ['testDebugUnitTest']) {
+    group = "Reporting"
+    description = "Generate Jacoco coverage reports"
+
+    reports {
+        xml.required = true
+        html.required = true
+        csv.required = false
+
+        html.destination file("${buildDir}/reports/coverage/test/debug/html")
+        xml.destination file("${buildDir}/reports/coverage/test/debug/coverage.xml")
+    }
+
+    def fileFilter = [
+            '**/R.class',
+            '**/R$*.class',
+            '**/BuildConfig.*',
+            '**/Manifest*.*',
+            '**/*Test*.*',
+            'android/**/*.*',
+            '**/di/**',
+            '**/*_Factory*',
+            '**/*_MembersInjector*',
+            '**/*$ViewInjector*',
+            '**/*$ViewBinder*',
+            '**/*Module*',
+            '**/*Component*',
+            '**/*BR*',
+            '**/Dagger*',
+            '**/*Hilt*',
+            '**/generated/**',
+            '**/databinding/**',
+            '**/*_MembersInjector.class',
+            '**/Dagger*Component.class',
+            '**/Dagger*Component$Builder.class',
+    ]
+
+    def debugTree = fileTree(dir: "${buildDir}/intermediates/classes/debug", excludes: fileFilter)
+    def mainSrc = "${project.projectDir}/src/main/java"
+
+    sourceDirectories.setFrom(files([mainSrc]))
+    classDirectories.setFrom(files([debugTree]))
+    executionData.setFrom(fileTree(dir: project.buildDir, includes: [
+            'jacoco/testDebugUnitTest.exec', 'outputs/code-coverage/connected/*coverage.ec'
+    ]))
+}
+
 tasks.register("fullJacocoReport") {
     it.dependsOn(
             connectedAndroidTest,
             testDebugUnitTest,
             createDebugUnitTestCoverageReport,
-            createDebugAndroidTestCoverageReport
+            createDebugAndroidTestCoverageReport,
+            jacocoTestReport
     )
 }

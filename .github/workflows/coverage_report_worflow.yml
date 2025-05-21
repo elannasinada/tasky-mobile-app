@@ -18,24 +18,90 @@ jobs:
           java-version: 17
           distribution: 'adopt'
 
+      - name: Install jq (for JSON validation)
+        run: brew install jq
+
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
       - name: Decode google-services.json
         env:
+          GOOGLE_SERVICES_BASE64: ${{ secrets.GOOGLE_SERVICES_BASE64 }}
           GOOGLE_SERVICES: ${{ secrets.GOOGLE_SERVICES }}
-        run: echo $GOOGLE_SERVICES > app/google-services.json
+        run: |
+          # Try Base64 encoded secret first (recommended approach)
+          if [ ! -z "$GOOGLE_SERVICES_BASE64" ]; then
+            echo "$GOOGLE_SERVICES_BASE64" | base64 --decode > app/google-services.json
+            echo "Using base64 encoded Google Services file"
+          # Fall back to direct JSON secret if available
+          elif [ ! -z "$GOOGLE_SERVICES" ]; then
+            echo "$GOOGLE_SERVICES" > app/google-services.json
+            echo "Using direct JSON Google Services file"
+          else
+            # Create a minimal placeholder if no secret available
+            echo '{"project_info":{"project_id":"dummy-project-id"}}' > app/google-services.json
+            echo "WARNING: Using minimal placeholder google-services.json."
+          fi
+
+      - name: Validate google-services.json
+        run: |
+          echo "Validating google-services.json file..."
+          if ! jq empty app/google-services.json; then
+            echo "ERROR: Invalid google-services.json file - not valid JSON!"
+            exit 1
+          fi
+          echo "google-services.json file is valid JSON"
+
+      - name: Create local.properties with Gemini API key
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'dummy-api-key' }}
+        run: |
+          echo "gemini.api.key=$GEMINI_API_KEY" > local.properties
 
       - name: Run Tests and Generate Coverage Report
         run: |
           # First run tests with continue on failure
-          ./gradlew clean test --continue || true
+          ./gradlew test --continue || true
           
-          # Then generate coverage report
-          ./gradlew createDebugUnitTestCoverageReport --warning-mode all -Pandroid.testInstrumentationRunnerArguments.notAnnotation=org.junit.Ignore || true
+          # Then generate coverage report - explicitly enable jacoco
+          ./gradlew jacocoTestReport || true
+          # Also try the standard coverage report task
+          ./gradlew createDebugUnitTestCoverageReport --warning-mode all || true
+
+      - name: Find coverage reports
+        run: |
+          echo "Looking for Jacoco coverage reports..."
+          find app/build -path "*/jacoco/*.xml" -o -path "*/jacoco/*.html" -o -path "*/reports/coverage/*" -type f | sort
+          
+          echo "Checking standard directory structure..."
+          find app/build/reports -type d | sort
+          
+          # Create directory if it doesn't exist to prevent upload failure
+          mkdir -p app/build/reports/coverage/test/debug/
+
+      - name: Consolidate coverage reports
+        run: |
+          # Create the output directory
+          mkdir -p app/build/reports/coverage/test/debug/
+          
+          # Copy any jacoco reports to the target directory
+          find app/build -path "*/jacoco/*" -type f -exec cp {} app/build/reports/coverage/test/debug/ \; || true
+          
+          # Copy any other coverage reports
+          find app/build/reports -path "*/coverage/*" -type f -exec cp {} app/build/reports/coverage/test/debug/ \; || true
+          
+          # Create a dummy file if nothing was found to prevent empty artifact
+          if [ ! "$(ls -A app/build/reports/coverage/test/debug/)" ]; then
+            echo "No coverage reports found - creating placeholder file" > app/build/reports/coverage/test/debug/report-not-generated.txt
+          fi
+          
+          # List what we found
+          echo "Files prepared for artifact upload:"
+          ls -la app/build/reports/coverage/test/debug/
 
       - name: Upload Unit Tests Coverage Report
         uses: actions/upload-artifact@v4
         with:
           name: Tasky-Coverage-Report
           path: 'app/build/reports/coverage/test/debug/'
+          if-no-files-found: warn
